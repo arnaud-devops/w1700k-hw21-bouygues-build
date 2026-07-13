@@ -53,6 +53,9 @@ only `ubi2-hw21-bouygues` and creates a prerelease containing:
 
 The workflow aborts if the checked-out OpenWrt commit differs from the pinned
 commit, if a feed differs from its lock, or if the selective patch is missing.
+The complete staged output is also retained as a GitHub Actions artifact for
+14 days before release creation, so a publication error does not discard a
+successful firmware build.
 
 ## Validation before flashing
 
