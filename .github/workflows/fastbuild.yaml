@@ -241,7 +241,25 @@ jobs:
             exit 1
           fi
         done
-        version_code=$(jq -er '.version_code | select(type == "string" and length > 0)' firmware/profiles.json)
+        for image in "${images[@]}"; do
+          image_name=${image#firmware/}
+          if ! awk -v name="$image_name" '{ file = $2; sub(/^\*/, "", file); if (file == name) found = 1 } END { exit !found }' firmware/sha256sums; then
+            echo "::error::The checksum file does not cover $image_name"
+            exit 1
+          fi
+          if ! jq -e --arg image "$image_name" '[.profiles[]?.images[]?.name] | index($image) != null' firmware/profiles.json >/dev/null; then
+            echo "::error::profiles.json does not describe $image_name"
+            exit 1
+          fi
+        done
+        if ! (cd firmware && sha256sum --check --ignore-missing --quiet sha256sums); then
+          echo "::error::A staged firmware checksum does not match sha256sums"
+          exit 1
+        fi
+        if ! version_code=$(jq -er '.version_code | select(type == "string" and length > 0)' firmware/profiles.json); then
+          echo "::error::profiles.json has no valid OpenWrt version_code"
+          exit 1
+        fi
         if [[ ! "$version_code" =~ ^[A-Za-z0-9._+-]+$ ]]; then
           echo "::error::Unsafe OpenWrt version code: $version_code"
           exit 1
