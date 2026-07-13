@@ -33,8 +33,15 @@ jobs:
       run: |
         mkdir -p openwrt_bin ghcache stcache dlcache
         if [ -z "$(ls -A ghcache 2>&-)" ] || [ -z "$(ls -A stcache 2>&-)" ]; then
-          I=ghcr.io/w1700k/fastbuild_base:base-bldcache-${{ matrix.target }}
-          docker pull $I 2>&- && { docker create --name CA $I >/dev/null; for d in ghcache stcache dlcache; do docker cp CA:/$d/. $d; done; }
+          I=ghcr.io/w1700k/fastbuild_base:base-bldcache-ubi2
+          if docker pull "$I" 2>&-; then
+            docker create --name CA "$I" >/dev/null
+            for dir in ghcache stcache dlcache; do
+              docker cp "CA:/$dir/." "$dir"
+            done
+          else
+            echo "::notice::The upstream UBI2 cache seed is unavailable; building with empty caches"
+          fi
         fi
 
     - name: Initialize environment
@@ -46,8 +53,12 @@ jobs:
         echo 'CONFIG_CCACHE_DIR="/ghcache"' >> user/current/config.diff
         sudo tee /etc/docker/daemon.json <<< '{"max-concurrent-downloads":50,"max-concurrent-uploads":50,"experimental":true}'
         sudo systemctl reload docker
-        IMAGE=$IMG_INC; docker pull $IMAGE 2>&- || IMAGE=ghcr.io/w1700k/fastbuild_base:base-builder
-        docker run -dt --name DK -v $PWD/user:$DK_USER -v $PWD/openwrt_bin:$DK_BIN -v $PWD/ghcache:/ghcache -v $PWD/stcache:/stcache -v $PWD/dlcache:/dlcache $IMAGE
+        IMAGE=$IMG_INC
+        if ! docker pull "$IMAGE" 2>&-; then
+          IMAGE=ghcr.io/w1700k/fastbuild_base:base-builder
+          docker pull "$IMAGE"
+        fi
+        docker run -dt --name DK -v "$PWD/user:$DK_USER" -v "$PWD/openwrt_bin:$DK_BIN" -v "$PWD/ghcache:/ghcache" -v "$PWD/stcache:/stcache" -v "$PWD/dlcache:/dlcache" "$IMAGE"
         install -m 755 /dev/stdin /usr/local/bin/docker_exec <<'DKR'
         #!/bin/bash
         for n in DK_BIN DK_USER DK_PROFILE DK_OPENWRT; do e+=(-e "$n=${!n}"); done
