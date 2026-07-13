@@ -1,0 +1,449 @@
+#!/bin/sh
+
+set -u
+
+TAG="dnsproxy-restore"
+LOCK_DIR="/var/lock/dnsproxy-restore.lock"
+WAN_WAIT_ATTEMPTS="${WAN_WAIT_ATTEMPTS:-60}"
+WAN_WAIT_DELAY="${WAN_WAIT_DELAY:-5}"
+APK_ATTEMPTS="${APK_ATTEMPTS:-6}"
+APK_RETRY_DELAY="${APK_RETRY_DELAY:-15}"
+WIFI_WAIT_ATTEMPTS="${WIFI_WAIT_ATTEMPTS:-30}"
+WIFI_WAIT_DELAY="${WIFI_WAIT_DELAY:-5}"
+REQUIRED_WPAD="${REQUIRED_WPAD:-wpad-openssl}"
+
+mode="${1:-restore}"
+
+log() {
+	logger -t "$TAG" "$*"
+	printf '%s: %s\n' "$TAG" "$*"
+}
+
+yes_no() {
+	if "$@"; then
+		printf 'yes\n'
+	else
+		printf 'no\n'
+	fi
+}
+
+have_dnsproxy_files() {
+	[ -x /usr/bin/dnsproxy ] && [ -x /etc/init.d/dnsproxy ]
+}
+
+dnsproxy_config_matches() {
+	[ "$(uci -q get dnsproxy.global.enabled 2>/dev/null)" = "1" ] &&
+	[ "$(uci -q get dnsproxy.global.insecure 2>/dev/null)" = "0" ] &&
+	[ "$(uci -q get dnsproxy.global.listen_addr 2>/dev/null)" = "127.0.0.1 ::1" ] &&
+	[ "$(uci -q get dnsproxy.global.listen_port 2>/dev/null)" = "5353" ] &&
+	[ "$(uci -q get dnsproxy.servers.upstream 2>/dev/null)" = "quic://unfiltered.adguard-dns.com" ] &&
+	[ "$(uci -q get dnsproxy.servers.fallback 2>/dev/null)" = "quic://dns.nextdns.io" ] &&
+	[ "$(uci -q get dnsproxy.servers.bootstrap 2>/dev/null)" = "185.222.222.222 45.11.45.11 2a09:: 2a11::" ]
+}
+
+dnsmasq_uses_dnsproxy() {
+	[ "$(uci -q get dhcp.@dnsmasq[0].noresolv 2>/dev/null)" = "1" ] &&
+	[ "$(uci -q get dhcp.@dnsmasq[0].server 2>/dev/null)" = "127.0.0.1#5353" ]
+}
+
+dnsproxy_is_running() {
+	/etc/init.d/dnsproxy status >/dev/null 2>&1
+}
+
+wifi_requires_full_wpad() {
+	uci -q show wireless 2>/dev/null |
+		grep -Eq '\.(bss_transition|wnm_sleep_mode)='
+}
+
+required_wpad_is_installed() {
+	if ! wifi_requires_full_wpad; then
+		return 0
+	fi
+	apk info -e "$REQUIRED_WPAD" >/dev/null 2>&1
+}
+
+configured_ap_count() {
+	ap_count=0
+	for ap_section in $(uci -q show wireless 2>/dev/null |
+		sed -n 's/^wireless\.\([^.=]*\)=wifi-iface$/\1/p'); do
+		[ "$(uci -q get "wireless.$ap_section.mode" 2>/dev/null)" = "ap" ] || continue
+		[ "$(uci -q get "wireless.$ap_section.disabled" 2>/dev/null)" = "1" ] && continue
+		ap_count=$((ap_count + 1))
+	done
+	printf '%s\n' "$ap_count"
+}
+
+active_hostapd_count() {
+	ubus list 'hostapd.*' 2>/dev/null | awk 'END { print NR + 0 }'
+}
+
+up_ap_interface_count() {
+	up_count=0
+	for ap_path in /sys/class/net/*-ap*; do
+		[ -e "$ap_path" ] || continue
+		[ "$(cat "$ap_path/operstate" 2>/dev/null)" = "up" ] || continue
+		up_count=$((up_count + 1))
+	done
+	printf '%s\n' "$up_count"
+}
+
+wireless_aps_are_ready() {
+	expected_count="$(configured_ap_count)"
+	[ "$expected_count" -eq 0 ] && return 0
+	[ "$(active_hostapd_count)" -ge "$expected_count" ] &&
+		[ "$(up_ap_interface_count)" -ge "$expected_count" ]
+}
+
+show_status() {
+	printf 'dnsproxy_files='
+	yes_no have_dnsproxy_files
+	printf 'dnsproxy_config='
+	yes_no dnsproxy_config_matches
+	printf 'dnsproxy_running='
+	yes_no dnsproxy_is_running
+	printf 'dnsmasq_chain='
+	yes_no dnsmasq_uses_dnsproxy
+	printf 'apk_world='
+	if grep -qx 'dnsproxy' /etc/apk/world 2>/dev/null; then
+		printf 'yes\n'
+	else
+		printf 'no\n'
+	fi
+	printf 'wifi_full_wpad_required='
+	yes_no wifi_requires_full_wpad
+	printf 'wifi_required_wpad='
+	yes_no required_wpad_is_installed
+	printf 'wifi_expected_aps=%s\n' "$(configured_ap_count)"
+	printf 'wifi_hostapd_aps=%s\n' "$(active_hostapd_count)"
+	printf 'wifi_up_aps=%s\n' "$(up_ap_interface_count)"
+	printf 'wifi_aps_ready='
+	yes_no wireless_aps_are_ready
+}
+
+restart_dnsmasq() {
+	/etc/init.d/dnsmasq restart >/dev/null 2>&1 || return 1
+	sleep 4
+}
+
+use_temporary_dns_sb() {
+	log "using DNS.SB temporarily while dnsproxy is restored"
+	uci -q delete dhcp.@dnsmasq[0].server
+	uci add_list dhcp.@dnsmasq[0].server='185.222.222.222'
+	uci add_list dhcp.@dnsmasq[0].server='45.11.45.11'
+	uci set dhcp.@dnsmasq[0].noresolv='1'
+	uci commit dhcp
+	restart_dnsmasq
+}
+
+use_dnsproxy_from_dnsmasq() {
+	uci -q delete dhcp.@dnsmasq[0].server
+	uci add_list dhcp.@dnsmasq[0].server='127.0.0.1#5353'
+	uci set dhcp.@dnsmasq[0].noresolv='1'
+	uci commit dhcp
+	restart_dnsmasq
+}
+
+configure_dnsproxy() {
+	uci -q batch <<'EOF'
+set dnsproxy.global=dnsproxy
+set dnsproxy.global.enabled='1'
+set dnsproxy.global.http3='0'
+set dnsproxy.global.insecure='0'
+set dnsproxy.global.ipv6_disabled='0'
+delete dnsproxy.global.listen_addr
+add_list dnsproxy.global.listen_addr='127.0.0.1'
+add_list dnsproxy.global.listen_addr='::1'
+delete dnsproxy.global.listen_port
+add_list dnsproxy.global.listen_port='5353'
+set dnsproxy.cache=dnsproxy
+set dnsproxy.cache.enabled='1'
+set dnsproxy.cache.cache_optimistic='1'
+set dnsproxy.cache.size='65535'
+set dnsproxy.servers=dnsproxy
+delete dnsproxy.servers.upstream
+add_list dnsproxy.servers.upstream='quic://unfiltered.adguard-dns.com'
+delete dnsproxy.servers.fallback
+add_list dnsproxy.servers.fallback='quic://dns.nextdns.io'
+delete dnsproxy.servers.bootstrap
+add_list dnsproxy.servers.bootstrap='185.222.222.222'
+add_list dnsproxy.servers.bootstrap='45.11.45.11'
+add_list dnsproxy.servers.bootstrap='2a09::'
+add_list dnsproxy.servers.bootstrap='2a11::'
+EOF
+	uci commit dnsproxy
+}
+
+wan_and_dns_are_ready() {
+	[ "$(ubus call network.interface.wan status 2>/dev/null | jsonfilter -e '@.up' 2>/dev/null)" = "true" ] || return 1
+	nslookup downloads.openwrt.org 127.0.0.1 >/dev/null 2>&1
+}
+
+wait_for_wan() {
+	attempt=1
+	while [ "$attempt" -le "$WAN_WAIT_ATTEMPTS" ]; do
+		wan_and_dns_are_ready && return 0
+		[ "$attempt" -eq 1 ] && log "waiting for WAN and temporary DNS"
+		sleep "$WAN_WAIT_DELAY"
+		attempt=$((attempt + 1))
+	done
+	return 1
+}
+
+install_dnsproxy() {
+	attempt=1
+	while [ "$attempt" -le "$APK_ATTEMPTS" ]; do
+		log "apk restore attempt $attempt/$APK_ATTEMPTS"
+		if apk update; then
+			if apk info -e dnsproxy >/dev/null 2>&1; then
+				apk fix dnsproxy && return 0
+			else
+				apk add dnsproxy && return 0
+			fi
+		fi
+		sleep "$APK_RETRY_DELAY"
+		attempt=$((attempt + 1))
+	done
+	return 1
+}
+
+refresh_apk_indexes() {
+	attempt=1
+	while [ "$attempt" -le "$APK_ATTEMPTS" ]; do
+		log "apk index refresh attempt $attempt/$APK_ATTEMPTS"
+		apk update && return 0
+		sleep "$APK_RETRY_DELAY"
+		attempt=$((attempt + 1))
+	done
+	return 1
+}
+
+installed_wpad_packages() {
+	apk info 2>/dev/null | grep -E '^wpad($|-)' || true
+}
+
+install_required_wpad() {
+	previous_wpad="$(installed_wpad_packages | tr '\n' ' ')"
+
+	if ! refresh_apk_indexes; then
+		return 1
+	fi
+
+	for package_name in $previous_wpad; do
+		[ "$package_name" = "$REQUIRED_WPAD" ] && continue
+		log "removing incompatible Wi-Fi package $package_name"
+		apk del "$package_name" || return 1
+	done
+
+	attempt=1
+	while [ "$attempt" -le "$APK_ATTEMPTS" ]; do
+		log "installing $REQUIRED_WPAD, attempt $attempt/$APK_ATTEMPTS"
+		apk add "$REQUIRED_WPAD" && return 0
+		apk update || true
+		sleep "$APK_RETRY_DELAY"
+		attempt=$((attempt + 1))
+	done
+
+	log "$REQUIRED_WPAD installation failed; attempting to restore the previous Wi-Fi package"
+	for package_name in $previous_wpad; do
+		[ "$package_name" = "$REQUIRED_WPAD" ] && continue
+		apk add "$package_name" || true
+	done
+	return 1
+}
+
+restart_wireless_stack() {
+	log "restarting wpad and the wireless interfaces"
+	/etc/init.d/wpad restart >/dev/null 2>&1 || return 1
+	wifi down >/dev/null 2>&1 || true
+	sleep 2
+	wifi up >/dev/null 2>&1 || return 1
+}
+
+wait_for_wireless_aps() {
+	attempt=1
+	while [ "$attempt" -le "$WIFI_WAIT_ATTEMPTS" ]; do
+		wireless_aps_are_ready && return 0
+		[ "$attempt" -eq 1 ] && log "waiting for the configured APs, including DFS CAC"
+		sleep "$WIFI_WAIT_DELAY"
+		attempt=$((attempt + 1))
+	done
+	return 1
+}
+
+wait_for_dnsproxy_query() {
+	attempt=1
+	while [ "$attempt" -le 15 ]; do
+		if dnsproxy_is_running && nslookup openwrt.org 127.0.0.1:5353 >/dev/null 2>&1; then
+			return 0
+		fi
+		sleep 2
+		attempt=$((attempt + 1))
+	done
+	return 1
+}
+
+cleanup() {
+	rmdir "$LOCK_DIR" 2>/dev/null || true
+}
+
+ensure_dnsproxy() {
+	if [ "$mode" != "--force" ] && have_dnsproxy_files && dnsproxy_config_matches; then
+		/etc/init.d/dnsproxy enable
+		if ! dnsproxy_is_running; then
+			log "dnsproxy is installed but stopped; starting it"
+			/etc/init.d/dnsproxy start
+			sleep 2
+		fi
+		if dnsproxy_is_running; then
+			if ! dnsmasq_uses_dnsproxy; then
+				log "restoring the dnsmasq to dnsproxy chain"
+				use_dnsproxy_from_dnsmasq || return 1
+			fi
+			log "dnsproxy healthy; no package restore needed"
+			return 0
+		fi
+	fi
+
+	if have_dnsproxy_files; then
+		log "configuring the dnsproxy package included in the firmware"
+		configure_dnsproxy || {
+			log "failed to configure the built-in dnsproxy package"
+			return 1
+		}
+
+		/etc/init.d/dnsproxy enable
+		/etc/init.d/dnsproxy restart
+
+		if wait_for_dnsproxy_query && use_dnsproxy_from_dnsmasq &&
+			nslookup openwrt.org 127.0.0.1 >/dev/null 2>&1; then
+			log "built-in dnsproxy configured; AdGuard DoQ is primary and NextDNS DoQ is fallback"
+			return 0
+		fi
+
+		log "built-in dnsproxy is not ready; using DNS.SB until the WAN hook retries"
+		use_temporary_dns_sb || true
+		return 1
+	fi
+
+	use_temporary_dns_sb || {
+		log "failed to activate temporary DNS.SB"
+		return 1
+	}
+
+	if ! wait_for_wan; then
+		log "WAN did not become ready; DNS.SB remains active and recovery will retry later"
+		return 1
+	fi
+
+	if ! install_dnsproxy; then
+		log "dnsproxy installation failed; DNS.SB remains active and recovery will retry later"
+		return 1
+	fi
+
+	if ! have_dnsproxy_files; then
+		log "dnsproxy package installation completed without the required service files"
+		return 1
+	fi
+
+	configure_dnsproxy || {
+		log "failed to configure dnsproxy; DNS.SB remains active"
+		return 1
+	}
+
+	/etc/init.d/dnsproxy enable
+	/etc/init.d/dnsproxy restart
+
+	if ! wait_for_dnsproxy_query; then
+		log "dnsproxy did not answer through DoQ; DNS.SB remains active"
+		return 1
+	fi
+
+	if ! use_dnsproxy_from_dnsmasq; then
+		log "failed to restore the dnsmasq chain; reverting to DNS.SB"
+		use_temporary_dns_sb || true
+		return 1
+	fi
+
+	if ! nslookup openwrt.org 127.0.0.1 >/dev/null 2>&1; then
+		log "final DNS validation failed; reverting to DNS.SB"
+		use_temporary_dns_sb || true
+		return 1
+	fi
+
+	if [ -f /etc/config/dnsproxy.apk-new ] && cmp -s /etc/config/dnsproxy /etc/config/dnsproxy.apk-new; then
+		rm -f /etc/config/dnsproxy.apk-new
+	fi
+
+	log "dnsproxy restored; AdGuard DoQ is primary and NextDNS DoQ is fallback"
+}
+
+ensure_wireless_stack() {
+	package_changed=0
+
+	if ! required_wpad_is_installed; then
+		log "the preserved Wi-Fi configuration requires $REQUIRED_WPAD"
+		if ! wait_for_wan; then
+			log "WAN or DNS is unavailable; Wi-Fi package recovery will retry later"
+			return 1
+		fi
+		if ! install_required_wpad; then
+			log "failed to restore $REQUIRED_WPAD"
+			return 1
+		fi
+		package_changed=1
+	fi
+
+	[ "$(configured_ap_count)" -eq 0 ] && return 0
+
+	if [ "$package_changed" -eq 0 ]; then
+		wireless_aps_are_ready && {
+			log "Wi-Fi healthy; no package restore needed"
+			return 0
+		}
+		wait_for_wireless_aps && {
+			log "Wi-Fi APs became ready"
+			return 0
+		}
+	fi
+
+	restart_wireless_stack || {
+		log "failed to restart the wireless stack"
+		return 1
+	}
+
+	if ! wait_for_wireless_aps; then
+		log "the configured Wi-Fi APs did not become ready"
+		return 1
+	fi
+
+	log "Wi-Fi restored with $REQUIRED_WPAD"
+}
+
+case "$mode" in
+	--check)
+		show_status
+		have_dnsproxy_files && dnsproxy_config_matches && dnsproxy_is_running &&
+			dnsmasq_uses_dnsproxy && required_wpad_is_installed && wireless_aps_are_ready
+		exit $?
+		;;
+	--force|restore)
+		;;
+	*)
+		printf 'usage: %s [--check|--force]\n' "$0" >&2
+		exit 2
+		;;
+esac
+
+mkdir -p /var/lock
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+	exit 0
+fi
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+dns_result=0
+wifi_result=0
+ensure_dnsproxy || dns_result=$?
+ensure_wireless_stack || wifi_result=$?
+
+[ "$dns_result" -eq 0 ] && [ "$wifi_result" -eq 0 ]
