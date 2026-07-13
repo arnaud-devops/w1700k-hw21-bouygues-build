@@ -136,7 +136,7 @@ jobs:
             echo "::error::OpenWrt source overlay is missing: $bp/source-files"
             exit 1
           }
-          cp -r "$bp/source-files/." .
+          cp -a --no-preserve=ownership,xattr "$bp/source-files/." .
           selective_patch=target/linux/airoha/patches-6.18/965-net-airoha-disable-hw-offload-for-ipv6-vlan-uplink-only.patch
           [ -f "$selective_patch" ] || {
             echo "::error::Selective IPv6/VLAN offload patch is missing"
