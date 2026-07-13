@@ -18,6 +18,8 @@ The OpenWrt `packages`, `luci`, and `routing` feeds are pinned separately in
 
 It adds only the selective IPv6/VLAN PPE patch originally published as
 [`ddb5d0c8ac6b8a7071a47b45fb13be3888d5d810`](https://github.com/OpenWRT-fanboy/OpenW1700k/commit/ddb5d0c8ac6b8a7071a47b45fb13be3888d5d810).
+The exact kernel patch is copied into the OpenWrt source tree from the
+profile's `source-files/` overlay before `make defconfig` runs.
 The patch declines hardware PPE offload for IPv6 WAN-uplink flows that require
 VLAN insertion. IPv4 and LAN-bound IPv6 remain eligible for PPE acceleration.
 
