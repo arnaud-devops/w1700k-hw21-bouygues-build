@@ -71,7 +71,6 @@ jobs:
           . $DK_USER/default/settings.ini &>/dev/null ||:
           . $DK_PROFILE/settings.ini
           [[ $REPO_URL && $REPO_BRANCH ]] || { echo "::error::Missing REPO_URL or REPO_BRANCH"; exit 1; }
-          mkdir -p $DK_OPENWRT/files
           cd $DK_OPENWRT
           if [ ! -d .git ]; then git init; fi
           git remote set-url origin $REPO_URL 2>&- || git remote add origin $REPO_URL
@@ -87,6 +86,7 @@ jobs:
           else
             git checkout -B "$REPO_BRANCH" FETCH_HEAD
           fi
+          mkdir -p files
           {
             echo "Builder repository: ${{ github.server_url }}/${{ github.repository }}"
             echo "Builder commit: ${{ github.sha }}"
