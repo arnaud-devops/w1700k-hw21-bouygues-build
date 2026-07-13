@@ -1,11 +1,14 @@
-name: fastbuild ubi2-oc, ubi2, snapshot
+name: build W1700K HW2.1 Bouygues
 on: workflow_dispatch
-permissions: write-all
+permissions:
+  actions: write
+  contents: write
+  packages: write
 jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ubuntu-24.04-arm
-    strategy: {fail-fast: false, matrix: {target: [ubi2-oc, ubi2, SNAPSHOT]}}
+    strategy: {fail-fast: false, matrix: {target: [ubi2-hw21-bouygues]}}
     env:
       DK_OPENWRT: /bld/openwrt
       DK_BIN: /bld/openwrt_bin
@@ -61,20 +64,98 @@ jobs:
           cd $DK_OPENWRT
           if [ ! -d .git ]; then git init; fi
           git remote set-url origin $REPO_URL 2>&- || git remote add origin $REPO_URL
-          git fetch && git checkout $REPO_BRANCH && git pull --rebase
-          { git log origin/main..$REPO_BRANCH --oneline || echo "(no commits ahead of main)"; } > files/build_info
+          git reset --hard HEAD 2>/dev/null ||:
+          git clean -fdx
+          git fetch --prune origin "$REPO_BRANCH"
+          if [[ $REPO_COMMIT ]]; then
+            git checkout --detach "$REPO_COMMIT"
+            [[ "$(git rev-parse HEAD)" == "$REPO_COMMIT" ]] || {
+              echo "::error::OpenWrt source commit does not match REPO_COMMIT"
+              exit 1
+            }
+          else
+            git checkout -B "$REPO_BRANCH" FETCH_HEAD
+          fi
+          {
+            echo "Builder repository: ${{ github.server_url }}/${{ github.repository }}"
+            echo "Builder commit: ${{ github.sha }}"
+            echo "OpenWrt repository: $REPO_URL"
+            echo "OpenWrt branch: $REPO_BRANCH"
+            echo "OpenWrt commit: $(git rev-parse HEAD)"
+            echo
+            git show -s --format="%H%n%ci%n%s" HEAD
+          } > files/build_info
           mountpoint $DK_BIN || { echo "::error::not mounted" >&2; exit 1; }
           cp files/build_info $DK_BIN
           ln -sf $DK_BIN bin && ln -sf /dlcache dl && ln -sf /stcache staging_dir
           bp=$DK_PROFILE fc=feeds.conf
           cp $bp/files/$fc $fc 2>&- && cp $fc /tmp/feeds.bak
-          rm -rf feeds/* &>/dev/null; ./scripts/feeds update -a &>/dev/null; ./scripts/feeds install -a
+          rm -rf feeds/* &>/dev/null
+          ./scripts/feeds update -a &>/dev/null
+          if [ -f "$bp/feeds.lock" ]; then
+            while read -r feed commit; do
+              [[ $feed && $commit && $feed != \#* ]] || continue
+              [ -d "feeds/$feed/.git" ] || {
+                echo "::error::Locked feed $feed was not cloned"
+                exit 1
+              }
+              git -C "feeds/$feed" fetch origin "$commit"
+              git -C "feeds/$feed" checkout --detach "$commit"
+              [[ "$(git -C "feeds/$feed" rev-parse HEAD)" == "$commit" ]] || {
+                echo "::error::Feed $feed does not match its lock"
+                exit 1
+              }
+            done < "$bp/feeds.lock"
+          fi
+          ./scripts/feeds install -a
           mv /tmp/feeds.bak $fc &>/dev/null ||:
+          {
+            echo
+            echo "Feed commits:"
+            for feed in feeds/*; do
+              [ -d "$feed/.git" ] || continue
+              printf "%s " "$(basename "$feed")"
+              git -C "$feed" rev-parse HEAD
+            done
+          } | tee -a files/build_info $DK_BIN/build_info >/dev/null
           cp $bp/config.diff .config
           cat $bp/patches/*.patch 2>&- | patch -d . -p0 --forward ||:
           cp -r $bp/files/ . &>/dev/null ||:
+          selective_patch=target/linux/airoha/patches-6.18/965-net-airoha-disable-hw-offload-for-ipv6-vlan-uplink-only.patch
+          [ -f "$selective_patch" ] || {
+            echo "::error::Selective IPv6/VLAN offload patch is missing"
+            exit 1
+          }
+          expected_patch_sha=cb52a01558f39bd0d664657ed99e7d00592573aebfd29d8fa399ae825230174e
+          actual_patch_sha=$(sha256sum "$selective_patch" | cut -d " " -f 1)
+          [[ "$actual_patch_sha" == "$expected_patch_sha" ]] || {
+            echo "::error::Selective IPv6/VLAN patch checksum mismatch"
+            exit 1
+          }
+          printf "%s  %s\n" "$actual_patch_sha" "$selective_patch" |
+            tee -a files/build_info $DK_BIN/build_info >/dev/null
           bash $bp/custom.sh &>/dev/null ||:
-          make defconfig; echo "CONFIG_VERSION_NUMBER=${{ matrix.target }}" >> .config
+          make defconfig
+          for option in \
+            CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi=y \
+            CONFIG_PACKAGE_dnsmasq-full=y \
+            CONFIG_PACKAGE_dnsproxy=y \
+            CONFIG_PACKAGE_wpad-openssl=y; do
+            grep -qx "$option" .config || {
+              echo "::error::Required build option is missing: $option"
+              exit 1
+            }
+          done
+          grep -qx "# CONFIG_PACKAGE_dnsmasq is not set" .config || {
+            echo "::error::The dnsmasq-full package would conflict with dnsmasq"
+            exit 1
+          }
+          grep -qx "# CONFIG_PACKAGE_wpad-basic-mbedtls is not set" .config || {
+            echo "::error::The full wpad package would conflict with wpad-basic-mbedtls"
+            exit 1
+          }
+          ./scripts/diffconfig.sh > $DK_BIN/config.diff
+          echo "CONFIG_VERSION_NUMBER=${{ matrix.target }}" >> .config
           make download -j8 2>&1 | tee /dev/stderr | grep -q "ERROR:" || [ $PIPESTATUS -ne 0 ] && exit 1 ||:
         '
 
@@ -94,10 +175,16 @@ jobs:
       run: |
         sudo chown -R "$(id -u):$(id -g)" openwrt_bin stcache
         find -L openwrt_bin/targets/*/* -maxdepth 1 -type f -exec install -D -t firmware {} +
-        VERSION="${{ matrix.target }}_$(date +'%Y.%m.%d')_$(jq -r '.version_code' firmware/profiles.json)"
+        VERSION="${{ matrix.target }}_$(date +'%Y.%m.%d')_$(jq -r '.version_code' firmware/profiles.json)_${GITHUB_SHA::7}"
         sed -i "s/^/    /; 1s/^/## $VERSION\n\n/" openwrt_bin/build_info
-        gh release list --json tagName --jq '.[].tagName' | grep "^${{ matrix.target }}_" | xargs -r gh release delete --cleanup-tag -y ||:
-        gh release create $VERSION firmware/*sysupgrade.itb --title $VERSION --notes-file openwrt_bin/build_info
+        assets=(firmware/*sysupgrade.itb)
+        for file in firmware/*manifest firmware/sha256sums firmware/profiles.json; do
+          [ -f "$file" ] && assets+=("$file")
+        done
+        cp openwrt_bin/build_info firmware/build-info.txt
+        cp openwrt_bin/config.diff firmware/config.diff
+        assets+=(firmware/build-info.txt firmware/config.diff)
+        gh release create "$VERSION" "${assets[@]}" --prerelease --title "$VERSION" --notes-file openwrt_bin/build_info
 
     - name: Upload builder container
       run: |

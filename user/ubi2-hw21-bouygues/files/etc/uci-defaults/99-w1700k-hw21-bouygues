@@ -1,0 +1,18 @@
+#!/bin/sh
+
+set -u
+
+append_sysupgrade_path() {
+	path="$1"
+	grep -qxF "$path" /etc/sysupgrade.conf 2>/dev/null ||
+		printf '%s\n' "$path" >> /etc/sysupgrade.conf
+}
+
+append_sysupgrade_path /usr/local/sbin/restore-dnsproxy-after-sysupgrade
+append_sysupgrade_path /etc/init.d/dnsproxy-restore
+append_sysupgrade_path /etc/hotplug.d/iface/95-dnsproxy-restore
+append_sysupgrade_path /etc/rc.d/S99dnsproxy-restore
+
+/etc/init.d/dnsproxy-restore enable
+
+exit 0
