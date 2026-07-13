@@ -154,6 +154,7 @@ jobs:
           make defconfig
           for option in \
             CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi=y \
+            CONFIG_JSON_OVERVIEW_IMAGE_INFO=y \
             CONFIG_PACKAGE_dnsmasq-full=y \
             CONFIG_PACKAGE_dnsproxy=y \
             CONFIG_PACKAGE_wpad-openssl=y; do
@@ -197,20 +198,62 @@ jobs:
           ' && break
         done
 
-    - name: Create release
+    - name: Stage firmware artifacts
       run: |
         sudo chown -R "$(id -u):$(id -g)" openwrt_bin stcache
-        find -L openwrt_bin/targets/*/* -maxdepth 1 -type f -exec install -D -t firmware {} +
-        VERSION="${{ matrix.target }}_$(date +'%Y.%m.%d')_$(jq -r '.version_code' firmware/profiles.json)_${GITHUB_SHA::7}"
-        sed -i "s/^/    /; 1s/^/## $VERSION\n\n/" openwrt_bin/build_info
-        assets=(firmware/*sysupgrade.itb)
-        for file in firmware/*manifest firmware/sha256sums firmware/profiles.json; do
-          [ -f "$file" ] && assets+=("$file")
-        done
+        rm -rf firmware
+        mkdir firmware
+        shopt -s nullglob
+        target_dirs=(openwrt_bin/targets/*/*)
+        if [ "${#target_dirs[@]}" -eq 0 ]; then
+          echo "::error::No OpenWrt target output directory was produced"
+          exit 1
+        fi
+        find -L "${target_dirs[@]}" -maxdepth 1 -type f -exec install -D -t firmware {} +
         cp openwrt_bin/build_info firmware/build-info.txt
         cp openwrt_bin/config.diff firmware/config.diff
-        assets+=(firmware/build-info.txt firmware/config.diff)
-        gh release create "$VERSION" "${assets[@]}" --prerelease --title "$VERSION" --notes-file openwrt_bin/build_info
+        echo "Staged firmware files:"
+        find firmware -maxdepth 1 -type f -printf '%f\n' | sort
+
+    - uses: actions/upload-artifact@v7
+      with:
+        name: firmware-${{ matrix.target }}-${{ github.run_id }}
+        path: firmware/
+        if-no-files-found: error
+        retention-days: 14
+
+    - name: Create release
+      run: |
+        shopt -s nullglob
+        images=(firmware/*sysupgrade.itb)
+        manifests=(firmware/*manifest)
+        if [ "${#images[@]}" -eq 0 ]; then
+          echo "::error::No sysupgrade ITB was produced"
+          exit 1
+        fi
+        if [ "${#manifests[@]}" -eq 0 ]; then
+          echo "::error::No package manifest was produced"
+          exit 1
+        fi
+        for file in firmware/sha256sums firmware/profiles.json firmware/build-info.txt firmware/config.diff; do
+          if [ ! -f "$file" ]; then
+            echo "::error::Required release file is missing: $file"
+            exit 1
+          fi
+        done
+        version_code=$(jq -er '.version_code | select(type == "string" and length > 0)' firmware/profiles.json)
+        if [[ ! "$version_code" =~ ^[A-Za-z0-9._+-]+$ ]]; then
+          echo "::error::Unsafe OpenWrt version code: $version_code"
+          exit 1
+        fi
+        VERSION="${{ matrix.target }}_$(date +'%Y.%m.%d')_${version_code}_${GITHUB_SHA::7}"
+        {
+          echo "## $VERSION"
+          echo
+          sed 's/^/    /' firmware/build-info.txt
+        } > firmware/release-notes.txt
+        assets=("${images[@]}" "${manifests[@]}" firmware/sha256sums firmware/profiles.json firmware/build-info.txt firmware/config.diff)
+        gh release create "$VERSION" "${assets[@]}" --prerelease --title "$VERSION" --notes-file firmware/release-notes.txt
 
     - name: Upload builder container
       run: |
