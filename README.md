@@ -28,7 +28,9 @@ mt7996 correctness fixes, including the upstream-proposed per-radio DT MAC
 export, a precise RTL8261CE model matcher derived from Gilly's universal tree,
 plus a serialized Wi-Fi flowtable hotplug handler. A profile-level source
 patch also preserves the active Gilly image's 6 GHz in-band discovery and EHT
-beamforming defaults in the actual `wifi-scripts` ucode files.
+beamforming defaults in the actual `wifi-scripts` ucode files. It bumps that
+architecture-independent package to `wifi-scripts 1.0-r2`, rebuilds it
+explicitly and verifies its package root before the full firmware build.
 The selection, upstream status and deliberately excluded experimental work are
 documented in [`AUDIT-2026-07-14.md`](AUDIT-2026-07-14.md).
 
@@ -78,7 +80,7 @@ with this patched kernel and embedded in the image. The restricted runtime APK
 repository list is versioned with the profile and omits the unused telephony
 and video indexes; snapshot contents remain rolling by design. A dedicated
 cache epoch forces one clean target rebuild when this native-ABI policy is
-introduced.
+introduced, and assembled `root-*` trees are never carried between builds.
 
 The recovery policy configures AdGuard Unfiltered DoQ as primary, NextDNS DoQ
 as fallback, and DNS.SB port 53 addresses only as bootstrap/recovery resolvers.

@@ -17,7 +17,7 @@ jobs:
       DK_USER: /bld/user
       DK_PROFILE: /bld/user/current
       GH_TOKEN: ${{ github.token }}
-      CACHE_EPOCH: native-abi-v1
+      CACHE_EPOCH: native-abi-v2
       BUILDER_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:cd751ad00ac9b994b503947f8cb9056ad9a3b15652b629784852b21e0fe66fd5
       CACHE_SEED_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:1c116f8db4cde4efd79b0c0123de0eb013f1ad51092f7b711568c812187fc9c4
     steps:
@@ -28,7 +28,7 @@ jobs:
 
     - id: gh
       uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
-      with: {path: "ghcache\nstcache", key: 'cache-${{ matrix.target }}.native-abi-v1.${{ github.run_id }}', restore-keys: 'cache-${{ matrix.target }}.native-abi-v1.'}
+      with: {path: "ghcache\nstcache", key: 'cache-${{ matrix.target }}.${{ env.CACHE_EPOCH }}.${{ github.run_id }}', restore-keys: 'cache-${{ matrix.target }}.${{ env.CACHE_EPOCH }}.'}
     - id: dl
       uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
       with: {path: dlcache, key: 'dlcache.${{ github.run_id }}', restore-keys: dlcache.}
@@ -51,6 +51,7 @@ jobs:
           rm -rf stcache/target-*
           touch "stcache/.${CACHE_EPOCH}"
         fi
+        sudo find stcache -type d -name 'root-*' -prune -exec rm -rf {} +
 
     - name: Initialize environment
       run: |
@@ -337,6 +338,43 @@ jobs:
 
     - name: Compile OpenWrt
       run: |
+        # wifi-scripts is architecture-independent and can otherwise survive in
+        # an inherited package cache. Rebuild it and inspect its package root
+        # before allowing the expensive firmware compile to proceed.
+        # shellcheck disable=SC2016
+        docker_exec DK bash -e -c '
+          cd "$DK_OPENWRT"
+          grep -Fq "append('"'"'unsol_bcast_probe_resp_interval'"'"', 20);" \
+            package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
+          grep -Fq "config.eht_su_beamformer ??= 1;" \
+            package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc
+          make package/network/config/wifi-scripts/clean
+          make package/network/config/wifi-scripts/compile V=s -j1
+          mapfile -t ap_files < <(find build_dir -type f \
+            -path "*/wifi-scripts-*/*/wifi-scripts/usr/share/ucode/wifi/ap.uc")
+          mapfile -t hostapd_files < <(find build_dir -type f \
+            -path "*/wifi-scripts-*/*/wifi-scripts/usr/share/ucode/wifi/hostapd.uc")
+          [ "${#ap_files[@]}" -gt 0 ] || {
+            echo "::error::No assembled wifi-scripts AP file was found"
+            exit 1
+          }
+          [ "${#hostapd_files[@]}" -gt 0 ] || {
+            echo "::error::No assembled wifi-scripts hostapd file was found"
+            exit 1
+          }
+          for file in "${ap_files[@]}"; do
+            grep -Fq "append('"'"'unsol_bcast_probe_resp_interval'"'"', 20);" "$file" || {
+              echo "::error::6 GHz discovery is absent from package file $file"
+              exit 1
+            }
+          done
+          for file in "${hostapd_files[@]}"; do
+            grep -Fq "config.eht_su_beamformer ??= 1;" "$file" || {
+              echo "::error::EHT defaults are absent from package file $file"
+              exit 1
+            }
+          done
+        '
         build_succeeded=false
         for mode in c s; do
           # shellcheck disable=SC2016
@@ -643,6 +681,10 @@ jobs:
             echo "::error::Unexpected arp-scan version in $manifest"
             exit 1
           }
+          grep -q '^wifi-scripts - 1\.0-r2$' "$manifest" || {
+            echo "::error::Unexpected wifi-scripts version in $manifest"
+            exit 1
+          }
           grep -q '^hostapd-common - .*~f08f2749' "$manifest" || {
             echo "::error::Unexpected hostapd version in $manifest"
             exit 1
@@ -704,6 +746,12 @@ jobs:
         for p in dlcache. cache-${{ matrix.target }}.${CACHE_EPOCH}.; do
           gh cache list --json key,id --jq '.[] | select(.key | startswith("'"$p"'")) | .id' | xargs -r gh cache delete
         done ||:
+
+    - name: Prepare caches for save
+      if: always()
+      run: |
+        sudo find stcache -type d -name 'root-*' -prune -exec rm -rf {} + ||:
+        sudo chown -R "$(id -u):$(id -g)" ghcache stcache dlcache ||:
 
     - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
       if: always()
