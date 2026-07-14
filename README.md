@@ -24,8 +24,9 @@ The patch declines hardware PPE offload for IPv6 WAN-uplink flows that require
 VLAN insertion. IPv4 and LAN-bound IPv6 remain eligible for PPE acceleration.
 
 The profile also carries a small, documented set of Airoha, thermal, GRO and
-mt7996 correctness fixes, a precise RTL8261CE model matcher derived from
-Gilly's universal tree, plus a serialized Wi-Fi flowtable hotplug handler.
+mt7996 correctness fixes, including the upstream-proposed per-radio DT MAC
+export, a precise RTL8261CE model matcher derived from Gilly's universal tree,
+plus a serialized Wi-Fi flowtable hotplug handler.
 The selection, upstream status and deliberately excluded experimental work are
 documented in [`AUDIT-2026-07-14.md`](AUDIT-2026-07-14.md).
 

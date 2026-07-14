@@ -1,3 +1,4 @@
+1271ff6598008f103cd27adde4749f766fb413a758a05ce59c11093ac9d4e6df  ./package/kernel/mt76/patches/004-set-per-radio-MAC-address-from-DT.patch
 cbd2035cbd528120a9a993381d65531bf6e8fa2922bc34e40509438f42599864  ./package/kernel/mt76/patches/016-wifi-mt76-connac-guard-NULL-HE-cap.patch
 40d1b552e6ce8b50deccacc780be913fea609afe5df29984245725ae55e781fc  ./package/kernel/mt76/patches/017-wifi-mt76-mt7996-guard-NULL-HE-cap.patch
 690b5b52568fed1ecb47469ca33e4a6ad4998454ff7fb2dc1dceea917c4b19e4  ./package/kernel/mt76/patches/018-wifi-mt76-mt7996-guard-NULL-EHT-cap.patch
