@@ -369,8 +369,15 @@ jobs:
             package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
           grep -Fq "config.eht_su_beamformer ??= 1;" \
             package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc
+          find -L bin -type f -name "wifi-scripts-*.apk" -delete
           make package/network/config/wifi-scripts/clean
           make package/network/config/wifi-scripts/compile V=s -j1
+          mapfile -t wifi_apks < <(find -L bin -type f -name "wifi-scripts-*.apk" -print)
+          [ "${#wifi_apks[@]}" -eq 1 ] || {
+            echo "::error::Expected one rebuilt wifi-scripts APK, found ${#wifi_apks[@]}"
+            printf "%s\n" "${wifi_apks[@]}"
+            exit 1
+          }
           mapfile -t ap_files < <(find build_dir -type f \
             -path "*/wifi-scripts-*/*/wifi-scripts/usr/share/ucode/wifi/ap.uc")
           mapfile -t hostapd_files < <(find build_dir -type f \
@@ -395,6 +402,26 @@ jobs:
               exit 1
             }
           done
+
+          # The package APK is authoritative for future package operations.
+          # Also overlay the exact same audited files after APK rootfs assembly;
+          # this prevents an inherited noarch package from replacing them.
+          install -D -m 0644 \
+            package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc \
+            files/usr/share/ucode/wifi/ap.uc
+          install -D -m 0644 \
+            package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc \
+            files/usr/share/ucode/wifi/hostapd.uc
+          {
+            echo
+            echo "Generated Wi-Fi rootfs overlay checksums:"
+            (
+              cd files
+              sha256sum \
+                ./usr/share/ucode/wifi/ap.uc \
+                ./usr/share/ucode/wifi/hostapd.uc
+            )
+          } | tee -a files/build_info "$DK_BIN/build_info" >/dev/null
         '
         build_succeeded=false
         for mode in c s; do
@@ -514,6 +541,14 @@ jobs:
             echo "::error::The br-lan IPv6 bridge netfilter hook is missing"
             exit 1
           }
+          for rel in \
+            usr/share/ucode/wifi/ap.uc \
+            usr/share/ucode/wifi/hostapd.uc; do
+            cmp "files/$rel" "$root/$rel" || {
+              echo "::error::The assembled rootfs does not contain the audited Wi-Fi overlay: $rel"
+              exit 1
+            }
+          done
           grep -Fq "append('unsol_bcast_probe_resp_interval', 20);" \
             "$root/usr/share/ucode/wifi/ap.uc" || {
             echo "::error::6 GHz in-band discovery is missing from wifi-scripts"
