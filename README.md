@@ -37,6 +37,7 @@ and explicitly includes:
 - `wpad-openssl` for the preserved 802.11k/v Wi-Fi configuration
 - `dnsmasq-full`
 - `dnsproxy` with DNS-over-QUIC support
+- `ethtool-full` for RTL8261CE link and PHY diagnostics
 - a boot and WAN recovery service for dnsproxy and full wpad
 
 Generic Attended Sysupgrade and `owut` are intentionally omitted because they
