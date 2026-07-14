@@ -35,9 +35,17 @@ append_sysupgrade_path /etc/rc.d/S99dnsproxy-restore
 # carrying a package-owned template into later, potentially incompatible fw4
 # versions once that stock rule is present.
 fw4_template=/usr/share/firewall4/templates/ruleset.uc
+rom_fw4_template="/rom$fw4_template"
 if [ -f /etc/sysupgrade.conf ] &&
+	grep -qxF "$fw4_template" /etc/sysupgrade.conf 2>/dev/null &&
 	grep -Fq 'meta l4proto { tcp, udp } flow offload @ft;' "$fw4_template" 2>/dev/null &&
-	! grep -Fq 'meta nfproto ipv4 meta l4proto' "$fw4_template" 2>/dev/null; then
+	! grep -Fq 'meta nfproto ipv4 meta l4proto' "$fw4_template" 2>/dev/null &&
+	grep -Fq 'meta l4proto { tcp, udp } flow offload @ft;' "$rom_fw4_template" 2>/dev/null &&
+	! grep -Fq 'meta nfproto ipv4 meta l4proto' "$rom_fw4_template" 2>/dev/null; then
+	# The current upgrade may already have restored an older package-owned
+	# template. Refresh it now; the sysupgrade.conf edit applies only later.
+	cp -f "$rom_fw4_template" "$fw4_template"
+	chmod 0644 "$fw4_template"
 	tmp_sysupgrade_conf="/tmp/sysupgrade.conf.$$"
 	grep -vxF "$fw4_template" /etc/sysupgrade.conf > "$tmp_sysupgrade_conf" || true
 	cat "$tmp_sysupgrade_conf" > /etc/sysupgrade.conf
