@@ -751,7 +751,16 @@ jobs:
           sed 's/^/    /' firmware/build-info.txt
         } > firmware/release-notes.txt
         assets=("${images[@]}" "${manifests[@]}" "${boms[@]}" firmware/sha256sums firmware/profiles.json firmware/build-info.txt firmware/config.diff)
-        gh release create "$VERSION" "${assets[@]}" --prerelease --title "$VERSION" --notes-file firmware/release-notes.txt
+        gh release create "$VERSION" "${assets[@]}" \
+          --target "$GITHUB_SHA" \
+          --prerelease \
+          --title "$VERSION" \
+          --notes-file firmware/release-notes.txt
+        tag_target=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION" --jq '.object.sha')
+        if [ "$tag_target" != "$GITHUB_SHA" ]; then
+          echo "::error::Release tag points to $tag_target instead of $GITHUB_SHA"
+          exit 1
+        fi
 
     - name: Delete old caches
       if: always()
