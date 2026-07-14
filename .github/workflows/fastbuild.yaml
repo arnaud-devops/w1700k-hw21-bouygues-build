@@ -2,7 +2,9 @@ name: build W1700K HW2.1 Bouygues
 on: workflow_dispatch
 permissions:
   actions: write
+  attestations: write
   contents: write
+  id-token: write
   packages: read
 jobs:
   build:
@@ -371,13 +373,20 @@ jobs:
           for rel in \
             etc/apk/repositories.d/distfeeds.list \
             etc/hotplug.d/iface/95-dnsproxy-restore \
+            etc/hotplug.d/net/50-nf-bridge-call \
             etc/init.d/dnsproxy-restore \
+            etc/uci-defaults/15-w1700k-flow-offload \
             etc/uci-defaults/99-w1700k-hw21-bouygues \
             usr/local/sbin/restore-dnsproxy-after-sysupgrade; do
-            cmp "$DK_PROFILE/files/$rel" "$root/$rel" || {
-              echo "::error::Assembled rootfs file differs from the locked profile: $rel"
+            if [ -f "$DK_PROFILE/files/$rel" ]; then
+              cmp "$DK_PROFILE/files/$rel" "$root/$rel" || {
+                echo "::error::Assembled rootfs file differs from the locked profile: $rel"
+                exit 1
+              }
+            elif [ ! -s "$root/$rel" ]; then
+              echo "::error::Required base file is missing from the rootfs: $rel"
               exit 1
-            }
+            fi
           done
 
           for rel in \
@@ -390,6 +399,8 @@ jobs:
             usr/bin/flock \
             usr/libexec/sftp-server \
             usr/sbin/ethtool \
+            usr/sbin/nft \
+            usr/sbin/odhcp6c \
             usr/sbin/wpad; do
             [ -x "$root/$rel" ] || {
               echo "::error::Required executable is missing from the rootfs: $rel"
@@ -432,6 +443,16 @@ jobs:
           grep -Fq "meta l4proto { tcp, udp } flow offload @ft;" \
             "$root/usr/share/firewall4/templates/ruleset.uc" || {
             echo "::error::The stock dual-stack fw4 flow rule is missing"
+            exit 1
+          }
+          grep -Fq "flock 9" \
+            "$root/etc/uci-defaults/15-w1700k-flow-offload" || {
+            echo "::error::The serialized Wi-Fi flowtable hook is missing"
+            exit 1
+          }
+          grep -Fq "nf_call_ip6tables" \
+            "$root/etc/hotplug.d/net/50-nf-bridge-call" || {
+            echo "::error::The br-lan IPv6 bridge netfilter hook is missing"
             exit 1
           }
           grep -Fq "append('unsol_bcast_probe_resp_interval', 20);" \
@@ -499,17 +520,27 @@ jobs:
         if-no-files-found: error
         retention-days: 14
 
+    - name: Attest sysupgrade provenance
+      uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+      with:
+        subject-path: firmware/*sysupgrade.itb
+
     - name: Create release
       run: |
         shopt -s nullglob
         images=(firmware/*sysupgrade.itb)
         manifests=(firmware/*manifest)
+        boms=(firmware/*.bom.cdx.json)
         if [ "${#images[@]}" -eq 0 ]; then
           echo "::error::No sysupgrade ITB was produced"
           exit 1
         fi
         if [ "${#manifests[@]}" -eq 0 ]; then
           echo "::error::No package manifest was produced"
+          exit 1
+        fi
+        if [ "${#boms[@]}" -eq 0 ]; then
+          echo "::error::No CycloneDX SBOM was produced"
           exit 1
         fi
           for manifest in "${manifests[@]}"; do
@@ -521,23 +552,42 @@ jobs:
               dnsmasq-full \
               dnsproxy \
               ethtool-full \
+              firewall4 \
               fping \
+              hostapd-common \
               iperf3 \
+              iw \
+              kmod-airoha-eth \
+              kmod-airoha-npu \
+              kmod-br-netfilter \
+              kmod-crypto-hw-eip93 \
+              kmod-dsa-mt7530-mmio \
+              kmod-mt7996-firmware \
+              kmod-mt7996-firmware-common \
               kmod-mt7996e \
+              kmod-nf-flow \
+              kmod-nft-offload \
+              kmod-phy-realtek \
               kmod-phy-rtl8261ce \
               libopenssl-legacy \
               libustream-openssl \
               luci-app-airoha-flowsense \
+              luci-app-firewall \
               luci-app-log-viewer \
               luci-app-package-manager \
               luci-app-watchcat \
               luci-app-w1700k-fancontrol \
+              luci-proto-ipv6 \
               luci-ssl-openssl \
               nano \
+              nftables-json \
+              odhcp6c \
+              odhcpd-ipv6only \
               openssl-util \
               openssh-sftp-server \
               rtl826x-firmware \
               watchcat \
+              wifi-scripts \
               wpad-openssl; do
             grep -q "^$package - " "$manifest" || {
               echo "::error::Required package is absent from $manifest: $package"
@@ -577,6 +627,26 @@ jobs:
             echo "::error::Unexpected wpad variant in $manifest: $unexpected_wpad"
             exit 1
           fi
+          grep -q '^dnsproxy - 0\.83\.0-r1$' "$manifest" || {
+            echo "::error::Unexpected dnsproxy version in $manifest"
+            exit 1
+          }
+          grep -q '^hostapd-common - .*~f08f2749' "$manifest" || {
+            echo "::error::Unexpected hostapd version in $manifest"
+            exit 1
+          }
+          grep -q '^wpad-openssl - .*~f08f2749' "$manifest" || {
+            echo "::error::Unexpected wpad version in $manifest"
+            exit 1
+          }
+          grep -q '^kmod-mt7996e - 6\.18\.38\..*~59676919' "$manifest" || {
+            echo "::error::Unexpected mt76 version in $manifest"
+            exit 1
+          }
+          grep -q '^luci-app-log-viewer - 1\.5\.0-r2$' "$manifest" || {
+            echo "::error::Unexpected log viewer version in $manifest"
+            exit 1
+          }
         done
         for file in firmware/sha256sums firmware/profiles.json firmware/build-info.txt firmware/config.diff; do
           if [ ! -f "$file" ]; then
@@ -613,7 +683,7 @@ jobs:
           echo
           sed 's/^/    /' firmware/build-info.txt
         } > firmware/release-notes.txt
-        assets=("${images[@]}" "${manifests[@]}" firmware/sha256sums firmware/profiles.json firmware/build-info.txt firmware/config.diff)
+        assets=("${images[@]}" "${manifests[@]}" "${boms[@]}" firmware/sha256sums firmware/profiles.json firmware/build-info.txt firmware/config.diff)
         gh release create "$VERSION" "${assets[@]}" --prerelease --title "$VERSION" --notes-file firmware/release-notes.txt
 
     - name: Delete old caches

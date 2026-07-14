@@ -1,5 +1,5 @@
 6b1ac6f1935b046f8028ccfb2ebe159e5b335c1750861202416d402d384d85c9  ./998-single-wiphy.patch
-5c40f9b4afc36c4ad5ec222ea05674be892c54df0b01c465cc957b5f7380b014  ./etc/apk/repositories.d/distfeeds.list
+000a7a552fb74b0f8baf85d7b8d467f42bb8e72c533de2f07989df1343e36bf5  ./etc/apk/repositories.d/distfeeds.list
 35e59d47bb4824e52c60777ced9606587fde7e95ce650fac0e6a84fa8eb22615  ./etc/fe_debug_reg.sh
 514c008a14adf322c1655617a7741272b3054e94efd487c0009c945b1a437063  ./etc/fe_reg.sh
 92fd8c625849b97b722db9cff2fcc2b8b7f6cc1cb18b8e653f44d4742efe0224  ./etc/gsw_status.sh

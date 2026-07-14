@@ -74,9 +74,11 @@ workflow only; the unrelated single-wiphy LuCI display fix remains included.
 
 The image does not force the official buildbot kernel `vermagic` and does not
 expose the generic OpenWrt `kmods` feed. All required kernel modules are built
-with this patched kernel and embedded in the image. The remaining userspace
-APK repository list is pinned with the profile. A dedicated cache epoch forces
-one clean target rebuild when this native-ABI policy is introduced.
+with this patched kernel and embedded in the image. The restricted runtime APK
+repository list is versioned with the profile and omits the unused telephony
+and video indexes; snapshot contents remain rolling by design. A dedicated
+cache epoch forces one clean target rebuild when this native-ABI policy is
+introduced.
 
 The recovery policy configures AdGuard Unfiltered DoQ as primary, NextDNS DoQ
 as fallback, and DNS.SB port 53 addresses only as bootstrap/recovery resolvers.
@@ -95,6 +97,7 @@ only `ubi2-hw21-bouygues` and creates a prerelease containing:
 
 - the UBI2 sysupgrade ITB
 - the package manifest
+- the OpenWrt CycloneDX SBOM
 - `sha256sums`
 - `profiles.json`
 - the effective `config.diff`
@@ -117,6 +120,9 @@ write permission and unpinned actions would serve no purpose.
 Before publishing, it also inspects the assembled rootfs for the required
 drivers, firmware, recovery files and executable modes, and rejects generic
 kernel feeds or upgrade/download helpers.
+The workflow creates a GitHub build-provenance attestation for the sysupgrade
+ITB before publishing it. It can be checked independently with
+`gh attestation verify IMAGE --repo arnaud-devops/w1700k-hw21-bouygues-build`.
 The complete staged output is also retained as a GitHub Actions artifact for
 14 days before release creation, so a publication error does not discard a
 successful firmware build.
