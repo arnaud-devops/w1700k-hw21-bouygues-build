@@ -9,4 +9,5 @@ feb566bec25103d4d7e018c4ef159c75eb0f4ab91885e3a66842e0ebb5d419ce  ./target/linux
 ad265dc04aa09b832d7ad4bff24a911be233d17c7d7359f546492cf23170f428  ./target/linux/airoha/patches-6.18/961-thermal-airoha-fix-low-trip-clamp.patch
 cb52a01558f39bd0d664657ed99e7d00592573aebfd29d8fa399ae825230174e  ./target/linux/airoha/patches-6.18/965-net-airoha-disable-hw-offload-for-ipv6-vlan-uplink-only.patch
 eddc71115c02e21f48d9d0a2cb0be72ed2569fd710dfa9e97c08dbee900de87f  ./target/linux/airoha/patches-6.18/968-net-airoha-synchronize-RCU-before-PPE-deinit.patch
+ec20a3a672f96cdf64dab57d06704c66bd7ba5bc793bd596999a5082dbbada8a  ./target/linux/airoha/patches-6.18/969-net-phy-rtl8261ce-match-genuine-ce-silicon.patch
 bf07112379d939ca8c92333d98101d285140e9ae30455eb54902534e862a3fbe  ./target/linux/generic/pending-6.18/992-net-gro-reject-flush-marked-skb-list-aggregation.patch
