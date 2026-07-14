@@ -549,7 +549,7 @@ jobs:
               exit 1
             }
           done
-          grep -Fq "append('unsol_bcast_probe_resp_interval', 20);" \
+          grep -Fq "append('"'"'unsol_bcast_probe_resp_interval'"'"', 20);" \
             "$root/usr/share/ucode/wifi/ap.uc" || {
             echo "::error::6 GHz in-band discovery is missing from wifi-scripts"
             exit 1
