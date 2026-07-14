@@ -139,6 +139,33 @@ The complete staged output is also retained as a GitHub Actions artifact for
 14 days before release creation, so a publication error does not discard a
 successful firmware build.
 
+## Hardened candidate (untested on hardware)
+
+The audited output from
+[workflow run 29362098839](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/29362098839)
+is published as the prerelease
+[`ubi2-hw21-bouygues_2026.07.14_r0+35356-7392ce326d_9e42ff1`](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.14_r0%2B35356-7392ce326d_9e42ff1).
+It is explicitly titled `[UNTESTED ON HW2.1 - DO NOT FLASH YET]`.
+
+The sysupgrade image is 20,104,015 bytes with SHA-256:
+
+```text
+c5a1ee53b1b009c8238a60829ed97a4ee402ef6de919aa11057cd7189cac1f65
+```
+
+The workflow compiled the image, validated the assembled rootfs, staged the
+release files and attested all seven intended assets. Its final publication
+gate produced a false negative because it expected the virtual package name
+`libustream-openssl`; the manifest correctly contains its current ABI package
+name `libustream-openssl20201210`. The unchanged workflow artifact was
+published manually, and the workflow now accepts the ABI-suffixed name.
+
+Both the CI artifact and the files downloaded from the release pass the
+independent workspace audit. Every public asset also passes GitHub attestation
+verification. This establishes reproducibility and offline integrity, not
+hardware approval: no image has been transferred to the router and the active
+Gilly build remains unchanged until an explicit flash decision.
+
 ## First candidate (superseded; do not flash)
 
 The first candidate was built successfully before the 2026-07-14 hardening by

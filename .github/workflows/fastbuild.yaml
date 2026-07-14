@@ -675,7 +675,6 @@ jobs:
               kmod-phy-realtek \
               kmod-phy-rtl8261ce \
               libopenssl-legacy \
-              libustream-openssl \
               luci-app-airoha-flowsense \
               luci-app-firewall \
               luci-app-log-viewer \
@@ -699,6 +698,10 @@ jobs:
               exit 1
             }
           done
+          grep -Eq '^libustream-openssl[0-9]* - ' "$manifest" || {
+            echo "::error::Required OpenSSL ustream ABI package is absent from $manifest"
+            exit 1
+          }
           for package in \
             apk-mbedtls \
             attendedsysupgrade-common \
@@ -792,6 +795,8 @@ jobs:
         fi
         VERSION="${{ matrix.target }}_$(date +'%Y.%m.%d')_${version_code}_${GITHUB_SHA::7}"
         {
+          echo "**UNTESTED ON PHYSICAL HW2.1. DO NOT FLASH YET.**"
+          echo
           echo "## $VERSION"
           echo
           sed 's/^/    /' firmware/build-info.txt
@@ -800,7 +805,7 @@ jobs:
         gh release create "$VERSION" "${assets[@]}" \
           --target "$GITHUB_SHA" \
           --prerelease \
-          --title "$VERSION" \
+          --title "[UNTESTED ON HW2.1 - DO NOT FLASH YET] $VERSION" \
           --notes-file firmware/release-notes.txt
         tag_target=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION" --jq '.object.sha')
         if [ "$tag_target" != "$GITHUB_SHA" ]; then
