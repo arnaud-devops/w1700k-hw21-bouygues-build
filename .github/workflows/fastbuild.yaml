@@ -268,6 +268,7 @@ jobs:
           for option in \
             CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi=y \
             CONFIG_JSON_OVERVIEW_IMAGE_INFO=y \
+            CONFIG_JSON_CYCLONEDX_SBOM=y \
             CONFIG_PACKAGE_apk-openssl=y \
             CONFIG_PACKAGE_dnsmasq-full=y \
             CONFIG_PACKAGE_dnsproxy=y \
