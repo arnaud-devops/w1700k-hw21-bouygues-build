@@ -171,6 +171,12 @@ jobs:
             } | tee -a files/build_info $DK_BIN/build_info >/dev/null
             rm -f "$profile_patch_actual"
           fi
+          hostapd_hash=c1a978092c8a6e43a9e1bd47e1f334637b9c4969ca741c30ff45c24539132ca4
+          if ! grep -qx "PKG_MIRROR_HASH:=$hostapd_hash" \
+            package/network/services/hostapd/Makefile; then
+            echo "::error::The hostapd source archive is not locked to the audited SHA-256"
+            exit 1
+          fi
           if [ -d "$bp/files" ]; then
             profile_lock=$bp/profile-files.sha256
             [ -f "$profile_lock" ] || {
@@ -568,7 +574,10 @@ jobs:
       with:
         subject-path: |
           firmware/*sysupgrade.itb
+          firmware/*manifest
           firmware/*.bom.cdx.json
+          firmware/sha256sums
+          firmware/profiles.json
           firmware/build-info.txt
           firmware/config.diff
 

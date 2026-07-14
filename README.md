@@ -30,7 +30,9 @@ plus a serialized Wi-Fi flowtable hotplug handler. A profile-level source
 patch also preserves the active Gilly image's 6 GHz in-band discovery and EHT
 beamforming defaults in the actual `wifi-scripts` ucode files. It bumps that
 architecture-independent package to `wifi-scripts 1.0-r2`, rebuilds it
-explicitly and verifies its package root before the full firmware build.
+explicitly and verifies its package root before the full firmware build. A
+second locked patch restores the deterministic SHA-256 for the July hostapd
+source archive instead of accepting Fanboy's temporary `skip` value.
 The selection, upstream status and deliberately excluded experimental work are
 documented in [`AUDIT-2026-07-14.md`](AUDIT-2026-07-14.md).
 
@@ -74,13 +76,17 @@ The inherited web CGI helpers that fetch generic `w1700k/builds` images are
 also removed. Upgrades for this profile go through the checksum-verified local
 workflow only; the unrelated single-wiphy LuCI display fix remains included.
 
-The image does not force the official buildbot kernel `vermagic` and does not
-expose the generic OpenWrt `kmods` feed. All required kernel modules are built
-with this patched kernel and embedded in the image. The restricted runtime APK
-repository list is versioned with the profile and omits the unused telephony
-and video indexes; snapshot contents remain rolling by design. A dedicated
-cache epoch forces one clean target rebuild when this native-ABI policy is
-introduced, and assembled `root-*` trees are never carried between builds.
+The image does not force the official buildbot kernel `vermagic` or expose a
+separate `/kmods/` repository. All required kernel modules are built with this
+patched kernel and embedded in the image. The target APK repository remains
+listed because OpenWrt publishes `wpad-openssl` there; it can also list kernel
+packages, but the native kernel ABI makes incompatible modules fail dependency
+resolution and the recovery command only requests named userspace packages.
+The restricted repository list is versioned with the profile and omits the
+unused telephony and video indexes; snapshot contents remain rolling by
+design. A dedicated cache epoch forces one clean target rebuild when this
+native-ABI policy is introduced, and assembled `root-*` trees are never
+carried between builds.
 
 The recovery policy configures AdGuard Unfiltered DoQ as primary, NextDNS DoQ
 as fallback, and DNS.SB port 53 addresses only as bootstrap/recovery resolvers.
@@ -124,9 +130,10 @@ drivers, firmware, recovery files and executable modes, and rejects generic
 kernel feeds or upgrade/download helpers.
 The workflow verifies that the published provenance is byte-for-byte identical
 to the `build_info` embedded in the rootfs. It creates a GitHub
-build-provenance attestation for the sysupgrade ITB, CycloneDX SBOM, published
-provenance and effective configuration before publishing them. The image can
-be checked independently with
+build-provenance attestation for the sysupgrade ITB, package manifest,
+CycloneDX SBOM, OpenWrt checksums/profile metadata, published provenance and
+effective configuration before publishing them. The image can be checked
+independently with
 `gh attestation verify IMAGE --repo arnaud-devops/w1700k-hw21-bouygues-build`.
 The complete staged output is also retained as a GitHub Actions artifact for
 14 days before release creation, so a publication error does not discard a
