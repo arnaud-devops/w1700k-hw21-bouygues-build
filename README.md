@@ -57,6 +57,26 @@ The complete staged output is also retained as a GitHub Actions artifact for
 14 days before release creation, so a publication error does not discard a
 successful firmware build.
 
+## Current candidate
+
+The first candidate was built successfully by
+[workflow run 29290389340](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/29290389340)
+and published as the prerelease
+[`ubi2-hw21-bouygues_2026.07.13_r0+35355-271d907218_3b43508`](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.13_r0%2B35355-271d907218_3b43508).
+
+The sysupgrade image is 25,695,055 bytes and has SHA-256:
+
+```text
+1d7ca1959a5c2c8e83ff18219058567a7b53bc7c68bb262625bae241575d2074
+```
+
+The release checksum, FIT contents, sysupgrade metadata, package manifest and
+extracted rootfs have been checked independently. The image contains the
+RTL8261CE module/firmware, MT7996/NPU firmware, `wpad-openssl`, `dnsproxy`,
+`dnsmasq-full`, and the exact recovery files from this repository. It has not
+yet been flashed on hardware and remains a candidate until post-sysupgrade
+WAN, LAN2, three-band Wi-Fi, DoQ and IPv4/IPv6 PPE tests pass.
+
 ## Validation before flashing
 
 Verify the release checksum and run OpenWrt's image metadata and compatibility
