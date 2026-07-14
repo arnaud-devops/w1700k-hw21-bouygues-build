@@ -1,0 +1,19 @@
+From: Wayen Yan <win847@gmail.com>
+Subject: [PATCH] thermal: airoha: Fix low trip clamp variable
+
+The low-trip branch clamps high into low. Clamp the requested low threshold so
+low and high thermal events remain independent.
+
+Signed-off-by: Wayen Yan <win847@gmail.com>
+---
+--- a/drivers/thermal/airoha_thermal.c
++++ b/drivers/thermal/airoha_thermal.c
+@@ -373,7 +373,7 @@ static int airoha_thermal_set_trips(stru
+ 
+ 	if (low != -INT_MAX) {
+ 		/* Validate low and clamp it to a supported value */
+-		low = clamp_t(int, high, RAW_TO_TEMP(priv, 0),
++		low = clamp_t(int, low, RAW_TO_TEMP(priv, 0),
+ 			      RAW_TO_TEMP(priv, FIELD_MAX(EN7581_DOUT_TADC_MASK)));
+ 
+ 		/* We offset the low temp of 1°C to trigger correct event */

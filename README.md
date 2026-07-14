@@ -11,17 +11,22 @@ used on a Bouygues/B&You routed connection:
 
 ## Source and fix
 
-The build pins Fanboy's UBI2 source commit
-[`271d907218b2e8fbaebd3fa2694f8b1467b3de28`](https://github.com/OpenWRT-fanboy/OpenW1700k/commit/271d907218b2e8fbaebd3fa2694f8b1467b3de28).
+The build pins Fanboy's audited UBI2 source commit
+[`7392ce326dd6f3299dc9ddf481a4f71c759a1e61`](https://github.com/OpenWRT-fanboy/OpenW1700k/commit/7392ce326dd6f3299dc9ddf481a4f71c759a1e61).
 The OpenWrt `packages`, `luci`, and `routing` feeds are pinned separately in
 [`feeds.lock`](user/ubi2-hw21-bouygues/feeds.lock).
 
-It adds only the selective IPv6/VLAN PPE patch originally published as
+Its primary behavioral fix is the selective IPv6/VLAN PPE patch originally published as
 [`ddb5d0c8ac6b8a7071a47b45fb13be3888d5d810`](https://github.com/OpenWRT-fanboy/OpenW1700k/commit/ddb5d0c8ac6b8a7071a47b45fb13be3888d5d810).
 The exact kernel patch is copied into the OpenWrt source tree from the
 profile's `source-files/` overlay before `make defconfig` runs.
 The patch declines hardware PPE offload for IPv6 WAN-uplink flows that require
 VLAN insertion. IPv4 and LAN-bound IPv6 remain eligible for PPE acceleration.
+
+The profile also carries a small, documented set of Airoha, thermal, GRO and
+mt7996 correctness fixes plus a serialized Wi-Fi flowtable hotplug handler.
+The selection, upstream status and deliberately excluded experimental work are
+documented in [`AUDIT-2026-07-14.md`](AUDIT-2026-07-14.md).
 
 ## Included profile
 
@@ -32,6 +37,11 @@ and explicitly includes:
 - `dnsmasq-full`
 - `dnsproxy` with DNS-over-QUIC support
 - a boot and WAN recovery service for dnsproxy and full wpad
+
+Generic Attended Sysupgrade and `owut` are intentionally omitted because they
+cannot reproduce this pinned custom patchset. The workflow also avoids
+`CONFIG_ALL_KMODS`; it validates all required device packages against the final
+image manifest instead.
 
 The recovery policy configures AdGuard Unfiltered DoQ as primary, NextDNS DoQ
 as fallback, and DNS.SB port 53 addresses only as bootstrap/recovery resolvers.
@@ -52,14 +62,17 @@ only `ubi2-hw21-bouygues` and creates a prerelease containing:
 - source, feed and builder provenance in `build-info.txt`
 
 The workflow aborts if the checked-out OpenWrt commit differs from the pinned
-commit, if a feed differs from its lock, or if the selective patch is missing.
+commit, if a feed differs from its lock, or if any source overlay differs from
+`source-files.sha256`. It fetches the immutable source commit explicitly so a
+later UBI2 branch rebase cannot make a cached checkout accidentally determine
+the build result.
 The complete staged output is also retained as a GitHub Actions artifact for
 14 days before release creation, so a publication error does not discard a
 successful firmware build.
 
-## Current candidate
+## First candidate (superseded for further testing)
 
-The first candidate was built successfully by
+The first candidate was built successfully before the 2026-07-14 hardening by
 [workflow run 29290389340](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/29290389340)
 and published as the prerelease
 [`ubi2-hw21-bouygues_2026.07.13_r0+35355-271d907218_3b43508`](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.13_r0%2B35355-271d907218_3b43508).
@@ -75,7 +88,8 @@ extracted rootfs have been checked independently. The image contains the
 RTL8261CE module/firmware, MT7996/NPU firmware, `wpad-openssl`, `dnsproxy`,
 `dnsmasq-full`, and the exact recovery files from this repository. It has not
 yet been flashed on hardware and remains a candidate until post-sysupgrade
-WAN, LAN2, three-band Wi-Fi, DoQ and IPv4/IPv6 PPE tests pass.
+WAN, LAN2, three-band Wi-Fi, DoQ and IPv4/IPv6 PPE tests pass. A newer hardened
+candidate must pass the same offline and hardware gates before replacing it.
 
 ## Validation before flashing
 

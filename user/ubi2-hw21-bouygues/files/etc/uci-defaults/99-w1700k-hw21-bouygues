@@ -13,6 +13,19 @@ append_sysupgrade_path /etc/init.d/dnsproxy-restore
 append_sysupgrade_path /etc/hotplug.d/iface/95-dnsproxy-restore
 append_sysupgrade_path /etc/rc.d/S99dnsproxy-restore
 
+# The selective kernel fix restores the stock dual-stack fw4 rule. Stop
+# carrying a package-owned template into later, potentially incompatible fw4
+# versions once that stock rule is present.
+fw4_template=/usr/share/firewall4/templates/ruleset.uc
+if [ -f /etc/sysupgrade.conf ] &&
+	grep -Fq 'meta l4proto { tcp, udp } flow offload @ft;' "$fw4_template" 2>/dev/null &&
+	! grep -Fq 'meta nfproto ipv4 meta l4proto' "$fw4_template" 2>/dev/null; then
+	tmp_sysupgrade_conf="/tmp/sysupgrade.conf.$$"
+	grep -vxF "$fw4_template" /etc/sysupgrade.conf > "$tmp_sysupgrade_conf" || true
+	cat "$tmp_sysupgrade_conf" > /etc/sysupgrade.conf
+	rm -f "$tmp_sysupgrade_conf"
+fi
+
 /etc/init.d/dnsproxy-restore enable
 
 exit 0

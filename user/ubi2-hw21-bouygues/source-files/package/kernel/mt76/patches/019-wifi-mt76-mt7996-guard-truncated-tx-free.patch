@@ -1,0 +1,25 @@
+From: Gilly1970 <gilroyscott@hotmail.com>
+Subject: [PATCH] wifi: mt76: mt7996: Stop tx_free parsing at the buffer edge
+
+AN7581 NPU tx_free descriptors can report an MSDU count that reaches the skb
+boundary. Stop at the real boundary while still releasing entries already
+collected from the descriptor.
+
+Signed-off-by: Gilly1970 <gilroyscott@hotmail.com>
+---
+--- a/mt7996/mac.c
++++ b/mt7996/mac.c
+@@ -1312,8 +1312,11 @@ mt7996_mac_tx_free(struct mt7996_dev *de
+ 		u32 msdu, info;
+ 		u8 i;
+ 
+-		if (WARN_ON_ONCE((void *)cur_info >= end))
+-			return;
++		if ((void *)cur_info >= end) {
++			pr_debug("mt7996: tx_free truncated, count=%u total=%u len=%d ver=%u\n",
++				 count, total, len, ver);
++			break;
++		}
+ 		/* 1'b1: new wcid pair.
+ 		 * 1'b0: msdu_id with the same 'wcid pair' as above.
+ 		 */

@@ -78,6 +78,9 @@ jobs:
           git clean -fdx
           git fetch --prune origin "$REPO_BRANCH"
           if [[ $REPO_COMMIT ]]; then
+            # Fanboy periodically rebases ubi2. Fetch the immutable object as
+            # well so a pinned build does not depend on branch reachability.
+            git fetch --no-tags origin "$REPO_COMMIT"
             git checkout --detach "$REPO_COMMIT"
             [[ "$(git rev-parse HEAD)" == "$REPO_COMMIT" ]] || {
               echo "::error::OpenWrt source commit does not match REPO_COMMIT"
@@ -130,27 +133,48 @@ jobs:
             done
           } | tee -a files/build_info $DK_BIN/build_info >/dev/null
           cp $bp/config.diff .config
-          cat $bp/patches/*.patch 2>&- | patch -d . -p0 --forward ||:
-          cp -r $bp/files/ . &>/dev/null ||:
+          shopt -s nullglob
+          for profile_patch in "$bp"/patches/*.patch; do
+            patch -d . -p0 --forward < "$profile_patch"
+          done
+          shopt -u nullglob
+          if [ -d "$bp/files" ]; then
+            cp -a --no-preserve=ownership,xattr "$bp/files/." files/
+          fi
           [ -d "$bp/source-files" ] || {
             echo "::error::OpenWrt source overlay is missing: $bp/source-files"
             exit 1
           }
+          overlay_lock=$bp/source-files.sha256
+          [ -f "$overlay_lock" ] || {
+            echo "::error::Source overlay checksum lock is missing: $overlay_lock"
+            exit 1
+          }
+          overlay_actual=$(mktemp)
+          (
+            cd "$bp/source-files"
+            find . -type f -print0 | sort -z | xargs -0 sha256sum
+          ) > "$overlay_actual"
+          if ! diff -u "$overlay_lock" "$overlay_actual"; then
+            echo "::error::Source overlay differs from source-files.sha256"
+            rm -f "$overlay_actual"
+            exit 1
+          fi
           cp -a --no-preserve=ownership,xattr "$bp/source-files/." .
           selective_patch=target/linux/airoha/patches-6.18/965-net-airoha-disable-hw-offload-for-ipv6-vlan-uplink-only.patch
           [ -f "$selective_patch" ] || {
             echo "::error::Selective IPv6/VLAN offload patch is missing"
             exit 1
           }
-          expected_patch_sha=cb52a01558f39bd0d664657ed99e7d00592573aebfd29d8fa399ae825230174e
-          actual_patch_sha=$(sha256sum "$selective_patch" | cut -d " " -f 1)
-          [[ "$actual_patch_sha" == "$expected_patch_sha" ]] || {
-            echo "::error::Selective IPv6/VLAN patch checksum mismatch"
-            exit 1
-          }
-          printf "%s  %s\n" "$actual_patch_sha" "$selective_patch" |
-            tee -a files/build_info $DK_BIN/build_info >/dev/null
-          bash $bp/custom.sh &>/dev/null ||:
+          {
+            echo
+            echo "Source overlay checksums:"
+            cat "$overlay_actual"
+          } | tee -a files/build_info $DK_BIN/build_info >/dev/null
+          rm -f "$overlay_actual"
+          if [ -f "$bp/custom.sh" ]; then
+            bash "$bp/custom.sh"
+          fi
           make defconfig
           for option in \
             CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi=y \
@@ -171,6 +195,16 @@ jobs:
             echo "::error::The full wpad package would conflict with wpad-basic-mbedtls"
             exit 1
           }
+          for forbidden_option in \
+            CONFIG_ALL_KMODS \
+            CONFIG_PACKAGE_attendedsysupgrade-common \
+            CONFIG_PACKAGE_luci-app-attendedsysupgrade \
+            CONFIG_PACKAGE_owut; do
+            if grep -qx "$forbidden_option=y" .config; then
+              echo "::error::Forbidden build option is enabled: $forbidden_option"
+              exit 1
+            fi
+          done
           ./scripts/diffconfig.sh > $DK_BIN/config.diff
           echo "CONFIG_VERSION_NUMBER=${{ matrix.target }}" >> .config
           download_log=$(mktemp)
@@ -245,6 +279,27 @@ jobs:
           echo "::error::No package manifest was produced"
           exit 1
         fi
+        for manifest in "${manifests[@]}"; do
+          for package in \
+            airoha-en7581-mt7996-npu-firmware \
+            dnsmasq-full \
+            dnsproxy \
+            kmod-mt7996e \
+            kmod-phy-rtl8261ce \
+            rtl826x-firmware \
+            wpad-openssl; do
+            grep -q "^$package - " "$manifest" || {
+              echo "::error::Required package is absent from $manifest: $package"
+              exit 1
+            }
+          done
+          for package in attendedsysupgrade-common luci-app-attendedsysupgrade owut wpad-basic-mbedtls; do
+            if grep -q "^$package - " "$manifest"; then
+              echo "::error::Forbidden package is present in $manifest: $package"
+              exit 1
+            fi
+          done
+        done
         for file in firmware/sha256sums firmware/profiles.json firmware/build-info.txt firmware/config.diff; do
           if [ ! -f "$file" ]; then
             echo "::error::Required release file is missing: $file"

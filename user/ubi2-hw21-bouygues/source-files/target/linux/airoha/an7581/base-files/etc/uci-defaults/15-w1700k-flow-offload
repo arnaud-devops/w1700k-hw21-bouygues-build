@@ -1,0 +1,42 @@
+#!/bin/sh
+
+# Install a hotplug script that reloads fw4 after Wi-Fi AP interfaces appear.
+# At boot, fw4 can run before hostapd has created every bridge member.
+
+mkdir -p /etc/hotplug.d/net
+cat > /etc/hotplug.d/net/50-flow-offload-wifi <<'HOTPLUG'
+#!/bin/sh
+
+[ "$ACTION" = "add" ] || exit 0
+
+DEV="${DEVICENAME:-$INTERFACE}"
+[ -n "$DEV" ] || exit 0
+
+case "$DEV" in
+	phy*-ap*) ;;
+	*) exit 0 ;;
+esac
+
+nft list flowtable inet fw4 ft 2>/dev/null | grep -qw "\"$DEV\"" && exit 0
+
+# Wait for an in-flight reload. Skipping a concurrent event can leave the AP
+# created last out of the flowtable until another firewall reload.
+(
+	mkdir -p /var/lock
+	exec 9>/var/lock/flow-offload-wifi.lock
+	flock 9
+	nft list flowtable inet fw4 ft 2>/dev/null | grep -qw "\"$DEV\"" && exit 0
+	sleep 2
+	/etc/init.d/firewall reload >/dev/null 2>&1
+	if nft list flowtable inet fw4 ft 2>/dev/null | grep -qw "\"$DEV\""; then
+		logger -t flow-offload-wifi "fw4 reloaded, $DEV added to flowtable"
+	else
+		logger -t flow-offload-wifi "WARNING: $DEV still missing from flowtable after fw4 reload"
+	fi
+) &
+
+exit 0
+HOTPLUG
+chmod +x /etc/hotplug.d/net/50-flow-offload-wifi
+
+exit 0
