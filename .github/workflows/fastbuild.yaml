@@ -53,6 +53,10 @@ jobs:
       run: |
         [ -f "user/${{ matrix.target }}/config.diff" ] || { echo "::error::config.diff not found for ${{ matrix.target }}"; exit 1; }
         rsync -aI --mkpath user/default/ user/${{ matrix.target }}/ user/current/ 2>&-
+        # Multiple-source rsync precedence differs between versions. Copy the
+        # profile hook and its lock explicitly after merging shared defaults.
+        cp -a user/${{ matrix.target }}/custom.sh user/current/custom.sh
+        cp -a user/${{ matrix.target }}/profile-hooks.sha256 user/current/profile-hooks.sha256
         echo 'CONFIG_CCACHE_DIR="/ghcache"' >> user/current/config.diff
         sudo tee /etc/docker/daemon.json <<< '{"max-concurrent-downloads":50,"max-concurrent-uploads":50,"experimental":true}'
         sudo systemctl reload docker
