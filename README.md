@@ -46,7 +46,8 @@ image manifest instead.
 The image does not force the official buildbot kernel `vermagic` and does not
 expose the generic OpenWrt `kmods` feed. All required kernel modules are built
 with this patched kernel and embedded in the image. The remaining userspace
-APK repository list is pinned with the profile.
+APK repository list is pinned with the profile. A dedicated cache epoch forces
+one clean target rebuild when this native-ABI policy is introduced.
 
 The recovery policy configures AdGuard Unfiltered DoQ as primary, NextDNS DoQ
 as fallback, and DNS.SB port 53 addresses only as bootstrap/recovery resolvers.

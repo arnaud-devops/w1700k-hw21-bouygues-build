@@ -15,7 +15,8 @@ jobs:
       DK_USER: /bld/user
       DK_PROFILE: /bld/user/current
       GH_TOKEN: ${{ github.token }}
-      IMG_INC: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ matrix.target }}-inc
+      CACHE_EPOCH: native-abi-v1
+      IMG_INC: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ matrix.target }}-native-abi-v1-inc
     steps:
     - uses: actions/checkout@v7
 
@@ -24,7 +25,7 @@ jobs:
 
     - id: gh
       uses: actions/cache/restore@v5
-      with: {path: "ghcache\nstcache", key: 'cache-${{ matrix.target }}.${{ github.run_id }}', restore-keys: 'cache-${{ matrix.target }}.'}
+      with: {path: "ghcache\nstcache", key: 'cache-${{ matrix.target }}.native-abi-v1.${{ github.run_id }}', restore-keys: 'cache-${{ matrix.target }}.native-abi-v1.'}
     - id: dl
       uses: actions/cache/restore@v5
       with: {path: dlcache, key: 'dlcache.${{ github.run_id }}', restore-keys: dlcache.}
@@ -42,6 +43,10 @@ jobs:
           else
             echo "::notice::The upstream UBI2 cache seed is unavailable; building with empty caches"
           fi
+        fi
+        if [ ! -f "stcache/.${CACHE_EPOCH}" ]; then
+          rm -rf stcache/target-*
+          touch "stcache/.${CACHE_EPOCH}"
         fi
 
     - name: Initialize environment
@@ -387,7 +392,7 @@ jobs:
     - name: Delete old caches
       if: always()
       run: |
-        for p in dlcache. cache-${{ matrix.target }}.; do
+        for p in dlcache. cache-${{ matrix.target }}.${CACHE_EPOCH}.; do
           gh cache list --json key,id --jq '.[] | select(.key | startswith("'"$p"'")) | .id' | xargs -r gh cache delete
         done ||:
 
