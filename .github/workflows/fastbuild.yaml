@@ -631,6 +631,10 @@ jobs:
             echo "::error::Unexpected dnsproxy version in $manifest"
             exit 1
           }
+          grep -q '^arp-scan - 1\.10\.0-r5$' "$manifest" || {
+            echo "::error::Unexpected arp-scan version in $manifest"
+            exit 1
+          }
           grep -q '^hostapd-common - .*~f08f2749' "$manifest" || {
             echo "::error::Unexpected hostapd version in $manifest"
             exit 1
