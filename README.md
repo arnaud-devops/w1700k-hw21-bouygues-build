@@ -44,6 +44,10 @@ cannot reproduce this pinned custom patchset. The workflow also avoids
 `CONFIG_ALL_KMODS`; it validates all required device packages against the final
 image manifest instead.
 
+The inherited web CGI helpers that fetch generic `w1700k/builds` images are
+also removed. Upgrades for this profile go through the checksum-verified local
+workflow only; the unrelated single-wiphy LuCI display fix remains included.
+
 The image does not force the official buildbot kernel `vermagic` and does not
 expose the generic OpenWrt `kmods` feed. All required kernel modules are built
 with this patched kernel and embedded in the image. The remaining userspace
@@ -70,10 +74,13 @@ only `ubi2-hw21-bouygues` and creates a prerelease containing:
 
 The workflow aborts if the checked-out OpenWrt commit differs from the pinned
 commit, if a feed differs from its lock, or if any source overlay differs from
-`source-files.sha256`. Profile files are independently checked against
-`profile-files.sha256`. It fetches the immutable source commit explicitly so a
-later UBI2 branch rebase cannot make a cached checkout accidentally determine
-the build result.
+`source-files.sha256`. Rootfs profile files and the profile hook are checked
+independently against `profile-files.sha256` and `profile-hooks.sha256`. It
+fetches the immutable source commit explicitly so a later UBI2 branch rebase
+cannot make a cached checkout accidentally determine the build result.
+Before publishing, it also inspects the assembled rootfs for the required
+drivers, firmware, recovery files and executable modes, and rejects generic
+kernel feeds or upgrade/download helpers.
 The complete staged output is also retained as a GitHub Actions artifact for
 14 days before release creation, so a publication error does not discard a
 successful firmware build.

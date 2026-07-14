@@ -186,6 +186,20 @@ jobs:
             } | tee -a files/build_info $DK_BIN/build_info >/dev/null
             rm -f "$profile_actual"
           fi
+          hook_lock=$bp/profile-hooks.sha256
+          [ -f "$hook_lock" ] || {
+            echo "::error::Profile hook checksum lock is missing: $hook_lock"
+            exit 1
+          }
+          (cd "$bp" && sha256sum -c "$(basename "$hook_lock")") || {
+            echo "::error::Profile hooks differ from profile-hooks.sha256"
+            exit 1
+          }
+          {
+            echo
+            echo "Profile hook checksums:"
+            cat "$hook_lock"
+          } | tee -a files/build_info $DK_BIN/build_info >/dev/null
           [ -d "$bp/source-files" ] || {
             echo "::error::OpenWrt source overlay is missing: $bp/source-files"
             exit 1
@@ -286,6 +300,88 @@ jobs:
           echo "::error::OpenWrt compilation failed in both compact and verbose modes"
           exit 1
         fi
+
+    - name: Validate assembled rootfs
+      run: |
+        # shellcheck disable=SC2016
+        docker_exec DK bash -e -c '
+          cd "$DK_OPENWRT"
+          mapfile -t roots < <(find build_dir -type d -name root-airoha -print)
+          if [ "${#roots[@]}" -ne 1 ]; then
+            echo "::error::Expected one assembled Airoha rootfs, found ${#roots[@]}"
+            exit 1
+          fi
+          root=${roots[0]}
+
+          for rel in \
+            etc/apk/repositories.d/distfeeds.list \
+            etc/hotplug.d/iface/95-dnsproxy-restore \
+            etc/init.d/dnsproxy-restore \
+            etc/uci-defaults/99-w1700k-hw21-bouygues \
+            usr/local/sbin/restore-dnsproxy-after-sysupgrade; do
+            cmp "$DK_PROFILE/files/$rel" "$root/$rel" || {
+              echo "::error::Assembled rootfs file differs from the locked profile: $rel"
+              exit 1
+            }
+          done
+
+          for rel in \
+            etc/hotplug.d/iface/95-dnsproxy-restore \
+            etc/init.d/dnsproxy-restore \
+            etc/uci-defaults/99-w1700k-hw21-bouygues \
+            usr/local/sbin/restore-dnsproxy-after-sysupgrade \
+            usr/sbin/wpad; do
+            [ -x "$root/$rel" ] || {
+              echo "::error::Required executable is missing from the rootfs: $rel"
+              exit 1
+            }
+          done
+
+          for rel in \
+            etc/vermagic.txt \
+            www/cgi-bin/github_check \
+            www/cgi-bin/github_fetch \
+            www/luci-static/resources/view/attendedsysupgrade; do
+            [ ! -e "$root/$rel" ] || {
+              echo "::error::Forbidden path is present in the rootfs: $rel"
+              exit 1
+            }
+          done
+
+          ! grep -q "/kmods/" "$root/etc/apk/repositories.d/distfeeds.list" || {
+            echo "::error::The assembled rootfs exposes a generic kmods feed"
+            exit 1
+          }
+          grep -Fq "meta l4proto { tcp, udp } flow offload @ft;" \
+            "$root/usr/share/firewall4/templates/ruleset.uc" || {
+            echo "::error::The stock dual-stack fw4 flow rule is missing"
+            exit 1
+          }
+
+          for rel in \
+            lib/firmware/airoha/en7581_MT7996_npu_data.bin \
+            lib/firmware/airoha/en7581_MT7996_npu_rv32.bin \
+            lib/firmware/mediatek/mt7996/mt7996_dsp.bin \
+            lib/firmware/mediatek/mt7996/mt7996_rom_patch.bin \
+            lib/firmware/mediatek/mt7996/mt7996_wa.bin \
+            lib/firmware/mediatek/mt7996/mt7996_wm.bin \
+            lib/firmware/rtl8261n.bin; do
+            [ -s "$root/$rel" ] || {
+              echo "::error::Required firmware is missing from the rootfs: $rel"
+              exit 1
+            }
+          done
+
+          for module in airoha_npu.ko airoha-eth.ko mt7996e.ko rtk-rtl8261ce-phy.ko; do
+            count=$(find "$root/lib/modules" -type f -name "$module" | wc -l)
+            [ "$count" -eq 1 ] || {
+              echo "::error::Expected one $module in the rootfs, found $count"
+              exit 1
+            }
+          done
+          [ "$(readlink "$root/usr/sbin/hostapd")" = wpad ]
+          [ "$(readlink "$root/usr/sbin/wpa_supplicant")" = wpad ]
+        '
 
     - name: Stage firmware artifacts
       run: |
