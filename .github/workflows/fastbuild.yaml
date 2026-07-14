@@ -2,8 +2,10 @@ name: build W1700K HW2.1 Bouygues
 on: workflow_dispatch
 permissions:
   actions: write
+  attestations: write
   contents: write
-  packages: write
+  id-token: write
+  packages: read
 jobs:
   build:
     name: Build ${{ matrix.target }}
@@ -15,25 +17,27 @@ jobs:
       DK_USER: /bld/user
       DK_PROFILE: /bld/user/current
       GH_TOKEN: ${{ github.token }}
-      IMG_INC: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ matrix.target }}-inc
+      CACHE_EPOCH: native-abi-v2
+      BUILDER_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:cd751ad00ac9b994b503947f8cb9056ad9a3b15652b629784852b21e0fe66fd5
+      CACHE_SEED_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:1c116f8db4cde4efd79b0c0123de0eb013f1ad51092f7b711568c812187fc9c4
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-    - uses: docker/login-action@v4
+    - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
       with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ github.token }}'}
 
     - id: gh
-      uses: actions/cache/restore@v5
-      with: {path: "ghcache\nstcache", key: 'cache-${{ matrix.target }}.${{ github.run_id }}', restore-keys: 'cache-${{ matrix.target }}.'}
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with: {path: "ghcache\nstcache", key: 'cache-${{ matrix.target }}.${{ env.CACHE_EPOCH }}.${{ github.run_id }}', restore-keys: 'cache-${{ matrix.target }}.${{ env.CACHE_EPOCH }}.'}
     - id: dl
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
       with: {path: dlcache, key: 'dlcache.${{ github.run_id }}', restore-keys: dlcache.}
 
     - name: Seed caches if missing
       run: |
         mkdir -p openwrt_bin ghcache stcache dlcache
         if [ -z "$(ls -A ghcache 2>&-)" ] || [ -z "$(ls -A stcache 2>&-)" ]; then
-          I=ghcr.io/w1700k/fastbuild_base:base-bldcache-ubi2
+          I=$CACHE_SEED_IMAGE
           if docker pull "$I" 2>&-; then
             docker create --name CA "$I" >/dev/null
             for dir in ghcache stcache dlcache; do
@@ -43,21 +47,25 @@ jobs:
             echo "::notice::The upstream UBI2 cache seed is unavailable; building with empty caches"
           fi
         fi
+        if [ ! -f "stcache/.${CACHE_EPOCH}" ]; then
+          rm -rf stcache/target-*
+          touch "stcache/.${CACHE_EPOCH}"
+        fi
+        sudo find stcache -type d -name 'root-*' -prune -exec rm -rf {} +
 
     - name: Initialize environment
       run: |
-        curl -Z --create-dirs -Lo user/default/files/etc/apk/repositories.d/distfeeds.list https://w1700k.github.io/builds/distfeeds.list
-        curl -Z -Lo user/default/files/etc/vermagic.txt https://w1700k.github.io/builds/vermagic.txt
         [ -f "user/${{ matrix.target }}/config.diff" ] || { echo "::error::config.diff not found for ${{ matrix.target }}"; exit 1; }
         rsync -aI --mkpath user/default/ user/${{ matrix.target }}/ user/current/ 2>&-
+        # Multiple-source rsync precedence differs between versions. Copy the
+        # profile hook and its lock explicitly after merging shared defaults.
+        cp -a user/${{ matrix.target }}/custom.sh user/current/custom.sh
+        cp -a user/${{ matrix.target }}/profile-hooks.sha256 user/current/profile-hooks.sha256
         echo 'CONFIG_CCACHE_DIR="/ghcache"' >> user/current/config.diff
         sudo tee /etc/docker/daemon.json <<< '{"max-concurrent-downloads":50,"max-concurrent-uploads":50,"experimental":true}'
         sudo systemctl reload docker
-        IMAGE=$IMG_INC
-        if ! docker pull "$IMAGE" 2>&-; then
-          IMAGE=ghcr.io/w1700k/fastbuild_base:base-builder
-          docker pull "$IMAGE"
-        fi
+        IMAGE=$BUILDER_IMAGE
+        docker pull "$IMAGE"
         docker run -dt --name DK -v "$PWD/user:$DK_USER" -v "$PWD/openwrt_bin:$DK_BIN" -v "$PWD/ghcache:/ghcache" -v "$PWD/stcache:/stcache" -v "$PWD/dlcache:/dlcache" "$IMAGE"
         install -m 755 /dev/stdin /usr/local/bin/docker_exec <<'DKR'
         #!/bin/bash
@@ -67,6 +75,7 @@ jobs:
 
     - name: Prepare OpenWrt source
       run: |
+        # shellcheck disable=SC2016
         docker_exec DK bash -e -c '
           . $DK_USER/default/settings.ini &>/dev/null ||:
           . $DK_PROFILE/settings.ini
@@ -78,6 +87,9 @@ jobs:
           git clean -fdx
           git fetch --prune origin "$REPO_BRANCH"
           if [[ $REPO_COMMIT ]]; then
+            # Fanboy periodically rebases ubi2. Fetch the immutable object as
+            # well so a pinned build does not depend on branch reachability.
+            git fetch --no-tags origin "$REPO_COMMIT"
             git checkout --detach "$REPO_COMMIT"
             [[ "$(git rev-parse HEAD)" == "$REPO_COMMIT" ]] || {
               echo "::error::OpenWrt source commit does not match REPO_COMMIT"
@@ -90,6 +102,7 @@ jobs:
           {
             echo "Builder repository: ${{ github.server_url }}/${{ github.repository }}"
             echo "Builder commit: ${{ github.sha }}"
+            echo "Builder container: ${{ env.BUILDER_IMAGE }}"
             echo "OpenWrt repository: $REPO_URL"
             echo "OpenWrt branch: $REPO_BRANCH"
             echo "OpenWrt commit: $(git rev-parse HEAD)"
@@ -130,33 +143,148 @@ jobs:
             done
           } | tee -a files/build_info $DK_BIN/build_info >/dev/null
           cp $bp/config.diff .config
-          cat $bp/patches/*.patch 2>&- | patch -d . -p0 --forward ||:
-          cp -r $bp/files/ . &>/dev/null ||:
+          if [ -d "$bp/patches" ]; then
+            profile_patch_lock=$bp/profile-patches.sha256
+            [ -f "$profile_patch_lock" ] || {
+              echo "::error::Profile patch checksum lock is missing: $profile_patch_lock"
+              exit 1
+            }
+            profile_patch_actual=$(mktemp)
+            (
+              cd "$bp"
+              find ./patches -type f -print0 | sort -z | xargs -0 sha256sum
+            ) > "$profile_patch_actual"
+            if ! diff -u "$profile_patch_lock" "$profile_patch_actual"; then
+              echo "::error::Profile patches differ from profile-patches.sha256"
+              rm -f "$profile_patch_actual"
+              exit 1
+            fi
+            shopt -s nullglob
+            for profile_patch in "$bp"/patches/*.patch; do
+              patch -d . -p0 --forward < "$profile_patch"
+            done
+            shopt -u nullglob
+            {
+              echo
+              echo "Profile patch checksums:"
+              cat "$profile_patch_actual"
+            } | tee -a files/build_info $DK_BIN/build_info >/dev/null
+            rm -f "$profile_patch_actual"
+          fi
+          hostapd_hash=8b17bbe5c77c59a876d0b0ae037679c696713deab6de4a1d05e000a4d593153a
+          if ! grep -qx "PKG_MIRROR_HASH:=$hostapd_hash" \
+            package/network/services/hostapd/Makefile; then
+            echo "::error::The hostapd source archive is not locked to the audited SHA-256"
+            exit 1
+          fi
+          if [ -d "$bp/files" ]; then
+            profile_lock=$bp/profile-files.sha256
+            [ -f "$profile_lock" ] || {
+              echo "::error::Profile file checksum lock is missing: $profile_lock"
+              exit 1
+            }
+            profile_actual=$(mktemp)
+            (
+              cd "$bp/files"
+              find . -type f -print0 | sort -z | xargs -0 sha256sum
+            ) > "$profile_actual"
+            if ! diff -u "$profile_lock" "$profile_actual"; then
+              echo "::error::Profile files differ from profile-files.sha256"
+              rm -f "$profile_actual"
+              exit 1
+            fi
+            distfeeds=$bp/files/etc/apk/repositories.d/distfeeds.list
+            [ -f "$distfeeds" ] || {
+              echo "::error::Pinned APK repository list is missing"
+              rm -f "$profile_actual"
+              exit 1
+            }
+            if grep -q "/kmods/" "$distfeeds"; then
+              echo "::error::Generic OpenWrt kmod feeds are forbidden for the patched kernel"
+              rm -f "$profile_actual"
+              exit 1
+            fi
+            if grep -Ev "^(#|$|https://downloads\\.openwrt\\.org/)" "$distfeeds" | grep -q .; then
+              echo "::error::Unexpected APK repository in $distfeeds"
+              rm -f "$profile_actual"
+              exit 1
+            fi
+            if [ -e "$bp/files/etc/vermagic.txt" ]; then
+              echo "::error::A forced buildbot kernel vermagic is forbidden"
+              rm -f "$profile_actual"
+              exit 1
+            fi
+            cp -a --no-preserve=ownership,xattr "$bp/files/." files/
+            {
+              echo
+              echo "Profile file checksums:"
+              cat "$profile_actual"
+            } | tee -a files/build_info $DK_BIN/build_info >/dev/null
+            rm -f "$profile_actual"
+          fi
+          hook_lock=$bp/profile-hooks.sha256
+          [ -f "$hook_lock" ] || {
+            echo "::error::Profile hook checksum lock is missing: $hook_lock"
+            exit 1
+          }
+          (cd "$bp" && sha256sum -c "$(basename "$hook_lock")") || {
+            echo "::error::Profile hooks differ from profile-hooks.sha256"
+            exit 1
+          }
+          {
+            echo
+            echo "Profile hook checksums:"
+            cat "$hook_lock"
+          } | tee -a files/build_info $DK_BIN/build_info >/dev/null
           [ -d "$bp/source-files" ] || {
             echo "::error::OpenWrt source overlay is missing: $bp/source-files"
             exit 1
           }
+          overlay_lock=$bp/source-files.sha256
+          [ -f "$overlay_lock" ] || {
+            echo "::error::Source overlay checksum lock is missing: $overlay_lock"
+            exit 1
+          }
+          overlay_actual=$(mktemp)
+          (
+            cd "$bp/source-files"
+            find . -type f -print0 | sort -z | xargs -0 sha256sum
+          ) > "$overlay_actual"
+          if ! diff -u "$overlay_lock" "$overlay_actual"; then
+            echo "::error::Source overlay differs from source-files.sha256"
+            rm -f "$overlay_actual"
+            exit 1
+          fi
           cp -a --no-preserve=ownership,xattr "$bp/source-files/." .
           selective_patch=target/linux/airoha/patches-6.18/965-net-airoha-disable-hw-offload-for-ipv6-vlan-uplink-only.patch
           [ -f "$selective_patch" ] || {
             echo "::error::Selective IPv6/VLAN offload patch is missing"
             exit 1
           }
-          expected_patch_sha=cb52a01558f39bd0d664657ed99e7d00592573aebfd29d8fa399ae825230174e
-          actual_patch_sha=$(sha256sum "$selective_patch" | cut -d " " -f 1)
-          [[ "$actual_patch_sha" == "$expected_patch_sha" ]] || {
-            echo "::error::Selective IPv6/VLAN patch checksum mismatch"
-            exit 1
-          }
-          printf "%s  %s\n" "$actual_patch_sha" "$selective_patch" |
-            tee -a files/build_info $DK_BIN/build_info >/dev/null
-          bash $bp/custom.sh &>/dev/null ||:
+          {
+            echo
+            echo "Source overlay checksums:"
+            cat "$overlay_actual"
+          } | tee -a files/build_info $DK_BIN/build_info >/dev/null
+          rm -f "$overlay_actual"
+          if [ -f "$bp/custom.sh" ]; then
+            bash "$bp/custom.sh"
+          fi
           make defconfig
           for option in \
             CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi=y \
             CONFIG_JSON_OVERVIEW_IMAGE_INFO=y \
+            CONFIG_JSON_CYCLONEDX_SBOM=y \
+            CONFIG_PACKAGE_apk-openssl=y \
             CONFIG_PACKAGE_dnsmasq-full=y \
             CONFIG_PACKAGE_dnsproxy=y \
+            CONFIG_PACKAGE_ethtool-full=y \
+            CONFIG_PACKAGE_libustream-openssl=y \
+            CONFIG_PACKAGE_luci-app-log-viewer=y \
+            CONFIG_PACKAGE_luci-app-watchcat=y \
+            CONFIG_PACKAGE_luci-ssl-openssl=y \
+            CONFIG_PACKAGE_openssh-sftp-server=y \
+            CONFIG_PACKAGE_watchcat=y \
             CONFIG_PACKAGE_wpad-openssl=y; do
             grep -qx "$option" .config || {
               echo "::error::Required build option is missing: $option"
@@ -171,6 +299,35 @@ jobs:
             echo "::error::The full wpad package would conflict with wpad-basic-mbedtls"
             exit 1
           }
+          forbidden_found=0
+          for forbidden_option in \
+            CONFIG_ALL_KMODS \
+            CONFIG_PACKAGE_apk-mbedtls \
+            CONFIG_PACKAGE_attendedsysupgrade-common \
+            CONFIG_PACKAGE_ca-certificates \
+            CONFIG_PACKAGE_curl \
+            CONFIG_PACKAGE_fastfetch \
+            CONFIG_PACKAGE_irqbalance \
+            CONFIG_PACKAGE_librespeed-go \
+            CONFIG_PACKAGE_libustream-mbedtls \
+            CONFIG_PACKAGE_luci-app-airoha-npu \
+            CONFIG_PACKAGE_luci-app-attendedsysupgrade \
+            CONFIG_PACKAGE_luci-app-filemanager \
+            CONFIG_PACKAGE_luci-app-irqbalance \
+            CONFIG_PACKAGE_luci-app-mlo \
+            CONFIG_PACKAGE_luci-app-netspeedtest \
+            CONFIG_PACKAGE_luci-app-ttyd \
+            CONFIG_PACKAGE_luci-app-wifi7 \
+            CONFIG_PACKAGE_luci-proto-relay \
+            CONFIG_PACKAGE_owut \
+            CONFIG_PACKAGE_relayd \
+            CONFIG_PACKAGE_ttyd; do
+            if grep -qx "$forbidden_option=y" .config; then
+              echo "::error::Forbidden build option is enabled: $forbidden_option"
+              forbidden_found=1
+            fi
+          done
+          [ "$forbidden_found" -eq 0 ] || exit 1
           ./scripts/diffconfig.sh > $DK_BIN/config.diff
           echo "CONFIG_VERSION_NUMBER=${{ matrix.target }}" >> .config
           download_log=$(mktemp)
@@ -179,17 +336,96 @@ jobs:
           download_status=${PIPESTATUS[0]}
           set -e
           if [ "$download_status" -ne 0 ] || grep -q "ERROR:" "$download_log"; then
-            echo "::error::OpenWrt source download failed"
-            rm -f "$download_log"
-            exit 1
+            echo "::warning::Parallel source download failed; retrying serially with verbose output"
+            if ! make download -j1 V=s; then
+              echo "::error::OpenWrt source download failed after the verbose retry"
+              rm -f "$download_log"
+              exit 1
+            fi
           fi
           rm -f "$download_log"
+          hostapd_archive=dl/hostapd-2026.07.09~f08f2749.tar.zst
+          [ -f "$hostapd_archive" ] || {
+            echo "::error::The pinned hostapd source archive was not produced"
+            exit 1
+          }
+          actual_hostapd_hash=$(sha256sum "$hostapd_archive")
+          actual_hostapd_hash=${actual_hostapd_hash%% *}
+          if [ "$actual_hostapd_hash" != "$hostapd_hash" ]; then
+            echo "::error::Hostapd archive hash is $actual_hostapd_hash, expected $hostapd_hash"
+            exit 1
+          fi
         '
 
     - name: Compile OpenWrt
       run: |
+        # wifi-scripts is architecture-independent and can otherwise survive in
+        # an inherited package cache. Rebuild it and inspect its package root
+        # before allowing the expensive firmware compile to proceed.
+        # shellcheck disable=SC2016
+        docker_exec DK bash -e -c '
+          cd "$DK_OPENWRT"
+          grep -Fq "append('"'"'unsol_bcast_probe_resp_interval'"'"', 20);" \
+            package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
+          grep -Fq "config.eht_su_beamformer ??= 1;" \
+            package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc
+          find -L bin -type f -name "wifi-scripts-*.apk" -delete
+          make package/network/config/wifi-scripts/clean
+          make package/network/config/wifi-scripts/compile V=s -j1
+          mapfile -t wifi_apks < <(find -L bin -type f -name "wifi-scripts-*.apk" -print)
+          [ "${#wifi_apks[@]}" -eq 1 ] || {
+            echo "::error::Expected one rebuilt wifi-scripts APK, found ${#wifi_apks[@]}"
+            printf "%s\n" "${wifi_apks[@]}"
+            exit 1
+          }
+          mapfile -t ap_files < <(find build_dir -type f \
+            -path "*/wifi-scripts-*/*/wifi-scripts/usr/share/ucode/wifi/ap.uc")
+          mapfile -t hostapd_files < <(find build_dir -type f \
+            -path "*/wifi-scripts-*/*/wifi-scripts/usr/share/ucode/wifi/hostapd.uc")
+          [ "${#ap_files[@]}" -gt 0 ] || {
+            echo "::error::No assembled wifi-scripts AP file was found"
+            exit 1
+          }
+          [ "${#hostapd_files[@]}" -gt 0 ] || {
+            echo "::error::No assembled wifi-scripts hostapd file was found"
+            exit 1
+          }
+          for file in "${ap_files[@]}"; do
+            grep -Fq "append('"'"'unsol_bcast_probe_resp_interval'"'"', 20);" "$file" || {
+              echo "::error::6 GHz discovery is absent from package file $file"
+              exit 1
+            }
+          done
+          for file in "${hostapd_files[@]}"; do
+            grep -Fq "config.eht_su_beamformer ??= 1;" "$file" || {
+              echo "::error::EHT defaults are absent from package file $file"
+              exit 1
+            }
+          done
+
+          # The package APK is authoritative for future package operations.
+          # Also overlay the exact same audited files after APK rootfs assembly;
+          # this prevents an inherited noarch package from replacing them.
+          install -D -m 0644 \
+            package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc \
+            files/usr/share/ucode/wifi/ap.uc
+          install -D -m 0644 \
+            package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc \
+            files/usr/share/ucode/wifi/hostapd.uc
+          {
+            echo
+            echo "Generated Wi-Fi rootfs overlay checksums:"
+            (
+              cd files
+              sha256sum \
+                ./usr/share/ucode/wifi/ap.uc \
+                ./usr/share/ucode/wifi/hostapd.uc
+            )
+          } | tee -a files/build_info "$DK_BIN/build_info" >/dev/null
+        '
         build_succeeded=false
         for mode in c s; do
+          # shellcheck disable=SC2016
           if docker_exec -e MODE=$mode DK bash -c '
             bash $DK_PROFILE/pre_compile.sh 2>&- ||:
             cd $DK_OPENWRT || exit 1
@@ -208,6 +444,156 @@ jobs:
           exit 1
         fi
 
+    - name: Validate assembled rootfs
+      run: |
+        # shellcheck disable=SC2016
+        docker_exec DK bash -e -c '
+          cd "$DK_OPENWRT"
+          mapfile -t roots < <(find build_dir -type d -name root-airoha -print)
+          if [ "${#roots[@]}" -ne 1 ]; then
+            echo "::error::Expected one assembled Airoha rootfs, found ${#roots[@]}"
+            exit 1
+          fi
+          root=${roots[0]}
+
+          for rel in \
+            etc/apk/repositories.d/distfeeds.list \
+            etc/hotplug.d/iface/95-dnsproxy-restore \
+            etc/hotplug.d/net/50-nf-bridge-call \
+            etc/init.d/dnsproxy-restore \
+            etc/uci-defaults/15-w1700k-flow-offload \
+            etc/uci-defaults/99-w1700k-hw21-bouygues \
+            usr/local/sbin/restore-dnsproxy-after-sysupgrade; do
+            if [ -f "$DK_PROFILE/files/$rel" ]; then
+              cmp "$DK_PROFILE/files/$rel" "$root/$rel" || {
+                echo "::error::Assembled rootfs file differs from the locked profile: $rel"
+                exit 1
+              }
+            elif [ ! -s "$root/$rel" ]; then
+              echo "::error::Required base file is missing from the rootfs: $rel"
+              exit 1
+            fi
+          done
+
+          for rel in \
+            etc/hotplug.d/iface/95-dnsproxy-restore \
+            etc/init.d/dnsproxy-restore \
+            etc/init.d/watchcat \
+            etc/uci-defaults/99-w1700k-hw21-bouygues \
+            usr/local/sbin/restore-dnsproxy-after-sysupgrade \
+            usr/bin/watchcat.sh \
+            usr/bin/flock \
+            usr/libexec/sftp-server \
+            usr/sbin/ethtool \
+            usr/sbin/nft \
+            usr/sbin/odhcp6c \
+            usr/sbin/wpad; do
+            [ -x "$root/$rel" ] || {
+              echo "::error::Required executable is missing from the rootfs: $rel"
+              exit 1
+            }
+          done
+
+          for rel in \
+            etc/init.d/irqbalance \
+            etc/init.d/ttyd \
+            etc/vermagic.txt \
+            usr/bin/curl \
+            usr/bin/fastfetch \
+            usr/bin/ttyd \
+            www/cgi-bin/github_check \
+            www/cgi-bin/github_fetch \
+            www/luci-static/resources/view/attendedsysupgrade \
+            www/luci-static/resources/view/filemanager \
+            www/luci-static/resources/view/ttyd; do
+            [ ! -e "$root/$rel" ] || {
+              echo "::error::Forbidden path is present in the rootfs: $rel"
+              exit 1
+            }
+          done
+          for rel in \
+            usr/share/luci/menu.d/luci-app-log-viewer.json \
+            usr/share/luci/menu.d/luci-app-watchcat.json \
+            usr/share/rpcd/ucode/luci.log-viewer \
+            www/luci-static/resources/view/watchcat.js; do
+            [ -s "$root/$rel" ] || {
+              echo "::error::Required administration file is missing: $rel"
+              exit 1
+            }
+          done
+
+          ! grep -q "/kmods/" "$root/etc/apk/repositories.d/distfeeds.list" || {
+            echo "::error::The assembled rootfs exposes a generic kmods feed"
+            exit 1
+          }
+          grep -Fq "meta l4proto { tcp, udp } flow offload @ft;" \
+            "$root/usr/share/firewall4/templates/ruleset.uc" || {
+            echo "::error::The stock dual-stack fw4 flow rule is missing"
+            exit 1
+          }
+          grep -Fq "flock 9" \
+            "$root/etc/uci-defaults/15-w1700k-flow-offload" || {
+            echo "::error::The serialized Wi-Fi flowtable hook is missing"
+            exit 1
+          }
+          grep -Fq "nf_call_ip6tables" \
+            "$root/etc/hotplug.d/net/50-nf-bridge-call" || {
+            echo "::error::The br-lan IPv6 bridge netfilter hook is missing"
+            exit 1
+          }
+          for rel in \
+            usr/share/ucode/wifi/ap.uc \
+            usr/share/ucode/wifi/hostapd.uc; do
+            cmp "files/$rel" "$root/$rel" || {
+              echo "::error::The assembled rootfs does not contain the audited Wi-Fi overlay: $rel"
+              exit 1
+            }
+          done
+          grep -Fq "append('"'"'unsol_bcast_probe_resp_interval'"'"', 20);" \
+            "$root/usr/share/ucode/wifi/ap.uc" || {
+            echo "::error::6 GHz in-band discovery is missing from wifi-scripts"
+            exit 1
+          }
+          for option in \
+            eht_su_beamformer \
+            eht_su_beamformee \
+            eht_mu_beamformer; do
+            grep -Fq "config.$option ??= 1;" \
+              "$root/usr/share/ucode/wifi/hostapd.uc" || {
+              echo "::error::EHT beamforming default is missing: $option"
+              exit 1
+            }
+          done
+
+          for rel in \
+            lib/firmware/airoha/en7581_MT7996_npu_data.bin \
+            lib/firmware/airoha/en7581_MT7996_npu_rv32.bin \
+            lib/firmware/mediatek/mt7996/mt7996_dsp.bin \
+            lib/firmware/mediatek/mt7996/mt7996_rom_patch.bin \
+            lib/firmware/mediatek/mt7996/mt7996_wa.bin \
+            lib/firmware/mediatek/mt7996/mt7996_wm.bin \
+            lib/firmware/rtl8261n.bin; do
+            [ -s "$root/$rel" ] || {
+              echo "::error::Required firmware is missing from the rootfs: $rel"
+              exit 1
+            }
+          done
+
+          for module in airoha_npu.ko airoha-eth.ko mt7996e.ko rtk-rtl8261ce-phy.ko; do
+            count=$(find "$root/lib/modules" -type f -name "$module" | wc -l)
+            [ "$count" -eq 1 ] || {
+              echo "::error::Expected one $module in the rootfs, found $count"
+              exit 1
+            }
+          done
+          [ "$(readlink "$root/usr/sbin/hostapd")" = wpad ]
+          [ "$(readlink "$root/usr/sbin/wpa_supplicant")" = wpad ]
+          cmp "$DK_BIN/build_info" "$root/build_info" || {
+            echo "::error::Embedded and staged build provenance differ"
+            exit 1
+          }
+        '
+
     - name: Stage firmware artifacts
       run: |
         sudo chown -R "$(id -u):$(id -g)" openwrt_bin stcache
@@ -225,18 +611,31 @@ jobs:
         echo "Staged firmware files:"
         find firmware -maxdepth 1 -type f -printf '%f\n' | sort
 
-    - uses: actions/upload-artifact@v7
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
       with:
         name: firmware-${{ matrix.target }}-${{ github.run_id }}
         path: firmware/
         if-no-files-found: error
         retention-days: 14
 
+    - name: Attest release provenance
+      uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+      with:
+        subject-path: |
+          firmware/*sysupgrade.itb
+          firmware/*manifest
+          firmware/*.bom.cdx.json
+          firmware/sha256sums
+          firmware/profiles.json
+          firmware/build-info.txt
+          firmware/config.diff
+
     - name: Create release
       run: |
         shopt -s nullglob
         images=(firmware/*sysupgrade.itb)
         manifests=(firmware/*manifest)
+        boms=(firmware/*.bom.cdx.json)
         if [ "${#images[@]}" -eq 0 ]; then
           echo "::error::No sysupgrade ITB was produced"
           exit 1
@@ -245,6 +644,126 @@ jobs:
           echo "::error::No package manifest was produced"
           exit 1
         fi
+        if [ "${#boms[@]}" -eq 0 ]; then
+          echo "::error::No CycloneDX SBOM was produced"
+          exit 1
+        fi
+          for manifest in "${manifests[@]}"; do
+            for package in \
+              airoha-en7581-mt7996-npu-firmware \
+              apk-openssl \
+              arp-scan \
+              ca-bundle \
+              dnsmasq-full \
+              dnsproxy \
+              ethtool-full \
+              firewall4 \
+              fping \
+              hostapd-common \
+              iperf3 \
+              iw \
+              kmod-airoha-eth \
+              kmod-airoha-npu \
+              kmod-br-netfilter \
+              kmod-crypto-hw-eip93 \
+              kmod-dsa-mt7530-mmio \
+              kmod-mt7996-firmware \
+              kmod-mt7996-firmware-common \
+              kmod-mt7996e \
+              kmod-nf-flow \
+              kmod-nft-offload \
+              kmod-phy-realtek \
+              kmod-phy-rtl8261ce \
+              libopenssl-legacy \
+              luci-app-airoha-flowsense \
+              luci-app-firewall \
+              luci-app-log-viewer \
+              luci-app-package-manager \
+              luci-app-watchcat \
+              luci-app-w1700k-fancontrol \
+              luci-proto-ipv6 \
+              luci-ssl-openssl \
+              nano \
+              nftables-json \
+              odhcp6c \
+              odhcpd-ipv6only \
+              openssl-util \
+              openssh-sftp-server \
+              rtl826x-firmware \
+              watchcat \
+              wifi-scripts \
+              wpad-openssl; do
+            grep -q "^$package - " "$manifest" || {
+              echo "::error::Required package is absent from $manifest: $package"
+              exit 1
+            }
+          done
+          grep -Eq '^libustream-openssl[0-9]* - ' "$manifest" || {
+            echo "::error::Required OpenSSL ustream ABI package is absent from $manifest"
+            exit 1
+          }
+          for package in \
+            apk-mbedtls \
+            attendedsysupgrade-common \
+            ca-certificates \
+            curl \
+            dnsmasq \
+            fastfetch \
+            irqbalance \
+            libcurl4 \
+            librespeed-go \
+            libustream-mbedtls \
+            luci-app-airoha-npu \
+            luci-app-attendedsysupgrade \
+            luci-app-filemanager \
+            luci-app-irqbalance \
+            luci-app-mlo \
+            luci-app-netspeedtest \
+            luci-app-ttyd \
+            luci-app-wifi7 \
+            luci-proto-relay \
+            owut \
+            relayd \
+            ttyd; do
+            if grep -q "^$package - " "$manifest"; then
+              echo "::error::Forbidden package is present in $manifest: $package"
+              exit 1
+            fi
+          done
+          unexpected_wpad=$(awk '$1 ~ /^wpad($|-)/ && $1 != "wpad-openssl" { print $1 }' "$manifest")
+          if [ -n "$unexpected_wpad" ]; then
+            echo "::error::Unexpected wpad variant in $manifest: $unexpected_wpad"
+            exit 1
+          fi
+          grep -q '^dnsproxy - 0\.83\.0-r1$' "$manifest" || {
+            echo "::error::Unexpected dnsproxy version in $manifest"
+            exit 1
+          }
+          grep -q '^arp-scan - 1\.10\.0-r5$' "$manifest" || {
+            echo "::error::Unexpected arp-scan version in $manifest"
+            exit 1
+          }
+          grep -q '^wifi-scripts - 1\.0-r2$' "$manifest" || {
+            echo "::error::Unexpected wifi-scripts version in $manifest"
+            exit 1
+          }
+          grep -q '^hostapd-common - .*~f08f2749' "$manifest" || {
+            echo "::error::Unexpected hostapd version in $manifest"
+            exit 1
+          }
+          grep -q '^wpad-openssl - .*~f08f2749' "$manifest" || {
+            echo "::error::Unexpected wpad version in $manifest"
+            exit 1
+          }
+          grep -q '^kmod-mt7996e - 6\.18\.38\..*~59676919' "$manifest" || {
+            echo "::error::Unexpected mt76 version in $manifest"
+            exit 1
+          }
+          grep -q '^luci-app-log-viewer - 1\.5\.0-r2$' "$manifest" || {
+            echo "::error::Unexpected log viewer version in $manifest"
+            exit 1
+          }
+        done
         for file in firmware/sha256sums firmware/profiles.json firmware/build-info.txt firmware/config.diff; do
           if [ ! -f "$file" ]; then
             echo "::error::Required release file is missing: $file"
@@ -276,29 +795,40 @@ jobs:
         fi
         VERSION="${{ matrix.target }}_$(date +'%Y.%m.%d')_${version_code}_${GITHUB_SHA::7}"
         {
+          echo "**UNTESTED ON PHYSICAL HW2.1. DO NOT FLASH YET.**"
+          echo
           echo "## $VERSION"
           echo
           sed 's/^/    /' firmware/build-info.txt
         } > firmware/release-notes.txt
-        assets=("${images[@]}" "${manifests[@]}" firmware/sha256sums firmware/profiles.json firmware/build-info.txt firmware/config.diff)
-        gh release create "$VERSION" "${assets[@]}" --prerelease --title "$VERSION" --notes-file firmware/release-notes.txt
-
-    - name: Upload builder container
-      run: |
-        docker_exec DK bash -c 'cd $DK_OPENWRT && rm -rf bin build_dir feeds tmp'
-        docker commit -a openwrt-fastbuild -m "Building at $(date)" DK $IMG_INC
-        docker push $IMG_INC
+        assets=("${images[@]}" "${manifests[@]}" "${boms[@]}" firmware/sha256sums firmware/profiles.json firmware/build-info.txt firmware/config.diff)
+        gh release create "$VERSION" "${assets[@]}" \
+          --target "$GITHUB_SHA" \
+          --prerelease \
+          --title "[UNTESTED ON HW2.1 - DO NOT FLASH YET] $VERSION" \
+          --notes-file firmware/release-notes.txt
+        tag_target=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION" --jq '.object.sha')
+        if [ "$tag_target" != "$GITHUB_SHA" ]; then
+          echo "::error::Release tag points to $tag_target instead of $GITHUB_SHA"
+          exit 1
+        fi
 
     - name: Delete old caches
       if: always()
       run: |
-        for p in dlcache. cache-${{ matrix.target }}.; do
+        for p in dlcache. cache-${{ matrix.target }}.${CACHE_EPOCH}.; do
           gh cache list --json key,id --jq '.[] | select(.key | startswith("'"$p"'")) | .id' | xargs -r gh cache delete
         done ||:
 
-    - uses: actions/cache/save@v5
+    - name: Prepare caches for save
+      if: always()
+      run: |
+        sudo find stcache -type d -name 'root-*' -prune -exec rm -rf {} + ||:
+        sudo chown -R "$(id -u):$(id -g)" ghcache stcache dlcache ||:
+
+    - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
       if: always()
       with: {path: "ghcache\nstcache", key: '${{ steps.gh.outputs.cache-primary-key }}'}
-    - uses: actions/cache/save@v5
+    - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
       if: always()
       with: {path: dlcache, key: '${{ steps.dl.outputs.cache-primary-key }}'}

@@ -1,0 +1,15 @@
+6b1ac6f1935b046f8028ccfb2ebe159e5b335c1750861202416d402d384d85c9  ./998-single-wiphy.patch
+000a7a552fb74b0f8baf85d7b8d467f42bb8e72c533de2f07989df1343e36bf5  ./etc/apk/repositories.d/distfeeds.list
+35e59d47bb4824e52c60777ced9606587fde7e95ce650fac0e6a84fa8eb22615  ./etc/fe_debug_reg.sh
+514c008a14adf322c1655617a7741272b3054e94efd487c0009c945b1a437063  ./etc/fe_reg.sh
+92fd8c625849b97b722db9cff2fcc2b8b7f6cc1cb18b8e653f44d4742efe0224  ./etc/gsw_status.sh
+2687c4d55cb2a475a82f3731d2a4bd25c61c90b5ecd30bee8874acd42423fda2  ./etc/hotplug.d/iface/95-dnsproxy-restore
+d2796ce57acb0549bde760836bc5104b7853cb2f6e8f5170c416f81b95452e24  ./etc/init.d/dnsproxy-restore
+e57c8c3fa7d8b8b493950649b5e82df4236986c38bf80a3d3237a6178dfa3721  ./etc/md.sh
+bec2c6fba5ae9ca936f5f1597e57fed9c941ca1e19694b818d2e076ecc75eec0  ./etc/testgpio.sh
+459597ece6a8f43c9ec695a9466ffbcde8a0a18d95d4cba0da5176a1318d5a8b  ./etc/uci-defaults/99-w1700k-hw21-bouygues
+817161ae569b00f3ac231f3f7e7b7368e2cc6c7ee3d48643a489a0561bd46483  ./etc/xsi_mac_dbg.sh
+b7a5c29ab7699ac095a6d6c88b3358d1d0c925c96983fb850b365b5ed90bead8  ./overview.js
+864bec1ec283f1bb2bc7df4781ec5ccac28c77d62d754b208a098b8c45084c45  ./usr/local/sbin/restore-dnsproxy-after-sysupgrade
+a9c61911e70a7a986bdd254854b13f129fdaaa193b2964c4bc89fa84d88d1bfd  ./www/cgi-bin/github_check
+35db02868196ce70d10cabcb8c3a86f3f725c39230b10133a467330046e7f17f  ./www/cgi-bin/github_fetch

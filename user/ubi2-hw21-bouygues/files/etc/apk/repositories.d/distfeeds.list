@@ -1,0 +1,8 @@
+# Restricted for this custom image. These snapshot indexes are rolling, but
+# the patched kernel deliberately has no generic OpenWrt kmod feed and every
+# required kernel module is built into the image.
+https://downloads.openwrt.org/snapshots/targets/airoha/an7581/packages/packages.adb
+https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/base/packages.adb
+https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/luci/packages.adb
+https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/packages/packages.adb
+https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/routing/packages.adb

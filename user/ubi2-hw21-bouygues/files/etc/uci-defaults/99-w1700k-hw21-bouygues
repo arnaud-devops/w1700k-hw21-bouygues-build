@@ -8,11 +8,51 @@ append_sysupgrade_path() {
 		printf '%s\n' "$path" >> /etc/sysupgrade.conf
 }
 
+restore_managed_file() {
+	path="$1"
+	mode="$2"
+	rom_path="/rom$path"
+
+	[ -f "$rom_path" ] || return 0
+	mkdir -p "${path%/*}"
+	cp -f "$rom_path" "$path"
+	chmod "$mode" "$path"
+}
+
+# These files are kept across generic sysupgrades so they can reinstall
+# dnsproxy/full wpad. A preserved older copy otherwise masks an updated copy
+# shipped by this profile, so make the current image authoritative here.
+restore_managed_file /usr/local/sbin/restore-dnsproxy-after-sysupgrade 0755
+restore_managed_file /etc/init.d/dnsproxy-restore 0755
+restore_managed_file /etc/hotplug.d/iface/95-dnsproxy-restore 0755
+
 append_sysupgrade_path /usr/local/sbin/restore-dnsproxy-after-sysupgrade
 append_sysupgrade_path /etc/init.d/dnsproxy-restore
 append_sysupgrade_path /etc/hotplug.d/iface/95-dnsproxy-restore
 append_sysupgrade_path /etc/rc.d/S99dnsproxy-restore
 
+# The selective kernel fix restores the stock dual-stack fw4 rule. Stop
+# carrying a package-owned template into later, potentially incompatible fw4
+# versions once that stock rule is present.
+fw4_template=/usr/share/firewall4/templates/ruleset.uc
+rom_fw4_template="/rom$fw4_template"
+if [ -f /etc/sysupgrade.conf ] &&
+	grep -qxF "$fw4_template" /etc/sysupgrade.conf 2>/dev/null &&
+	grep -Fq 'meta l4proto { tcp, udp } flow offload @ft;' "$fw4_template" 2>/dev/null &&
+	! grep -Fq 'meta nfproto ipv4 meta l4proto' "$fw4_template" 2>/dev/null &&
+	grep -Fq 'meta l4proto { tcp, udp } flow offload @ft;' "$rom_fw4_template" 2>/dev/null &&
+	! grep -Fq 'meta nfproto ipv4 meta l4proto' "$rom_fw4_template" 2>/dev/null; then
+	# The current upgrade may already have restored an older package-owned
+	# template. Refresh it now; the sysupgrade.conf edit applies only later.
+	cp -f "$rom_fw4_template" "$fw4_template"
+	chmod 0644 "$fw4_template"
+	tmp_sysupgrade_conf="/tmp/sysupgrade.conf.$$"
+	grep -vxF "$fw4_template" /etc/sysupgrade.conf > "$tmp_sysupgrade_conf" || true
+	cat "$tmp_sysupgrade_conf" > /etc/sysupgrade.conf
+	rm -f "$tmp_sysupgrade_conf"
+fi
+
+/etc/init.d/dnsproxy-restore disable
 /etc/init.d/dnsproxy-restore enable
 
 exit 0

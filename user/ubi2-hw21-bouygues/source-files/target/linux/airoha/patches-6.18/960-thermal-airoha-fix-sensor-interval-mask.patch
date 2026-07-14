@@ -1,0 +1,19 @@
+From: Wayen Yan <win847@gmail.com>
+Subject: [PATCH] thermal: airoha: Fix sensor interval FIELD_PREP mask
+
+The second field targets FILT_INTERVAL again, leaving SEN_INTERVAL at zero.
+Use the sensor interval mask for the documented 379-cycle value.
+
+Signed-off-by: Wayen Yan <win847@gmail.com>
+---
+--- a/drivers/thermal/airoha_thermal.c
++++ b/drivers/thermal/airoha_thermal.c
+@@ -503,7 +503,7 @@ static void airoha_thermal_setup_monitor
+ 	 */
+ 	regmap_write(priv->map, EN7581_TEMPMONCTL2,
+ 		     FIELD_PREP(EN7581_FILT_INTERVAL, 1) |
+-		     FIELD_PREP(EN7581_FILT_INTERVAL, 379));
++		     FIELD_PREP(EN7581_SEN_INTERVAL, 379));
+ 
+ 	/* AHB poll is set to 146 * 68.64 = 10.02us */
+ 	regmap_write(priv->map, EN7581_TEMPAHBPOLL,

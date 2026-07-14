@@ -11,30 +11,89 @@ used on a Bouygues/B&You routed connection:
 
 ## Source and fix
 
-The build pins Fanboy's UBI2 source commit
-[`271d907218b2e8fbaebd3fa2694f8b1467b3de28`](https://github.com/OpenWRT-fanboy/OpenW1700k/commit/271d907218b2e8fbaebd3fa2694f8b1467b3de28).
+The build pins Fanboy's audited UBI2 source commit
+[`7392ce326dd6f3299dc9ddf481a4f71c759a1e61`](https://github.com/OpenWRT-fanboy/OpenW1700k/commit/7392ce326dd6f3299dc9ddf481a4f71c759a1e61).
 The OpenWrt `packages`, `luci`, and `routing` feeds are pinned separately in
 [`feeds.lock`](user/ubi2-hw21-bouygues/feeds.lock).
 
-It adds only the selective IPv6/VLAN PPE patch originally published as
+Its primary behavioral fix is the selective IPv6/VLAN PPE patch originally published as
 [`ddb5d0c8ac6b8a7071a47b45fb13be3888d5d810`](https://github.com/OpenWRT-fanboy/OpenW1700k/commit/ddb5d0c8ac6b8a7071a47b45fb13be3888d5d810).
 The exact kernel patch is copied into the OpenWrt source tree from the
 profile's `source-files/` overlay before `make defconfig` runs.
 The patch declines hardware PPE offload for IPv6 WAN-uplink flows that require
 VLAN insertion. IPv4 and LAN-bound IPv6 remain eligible for PPE acceleration.
 
+The profile also carries a small, documented set of Airoha, thermal, GRO and
+mt7996 correctness fixes, including the upstream-proposed per-radio DT MAC
+export, a precise RTL8261CE model matcher derived from Gilly's universal tree,
+plus a serialized Wi-Fi flowtable hotplug handler. A profile-level source
+patch also preserves the active Gilly image's 6 GHz in-band discovery and EHT
+beamforming defaults in the actual `wifi-scripts` ucode files. It bumps that
+architecture-independent package to `wifi-scripts 1.0-r2`, rebuilds it
+explicitly and verifies its package root before the full firmware build. A
+second locked patch restores the deterministic SHA-256 for the July hostapd
+source archive instead of accepting Fanboy's temporary `skip` value.
+The selection, upstream status and deliberately excluded experimental work are
+documented in [`AUDIT-2026-07-14.md`](AUDIT-2026-07-14.md).
+
 ## Included profile
 
-The `ubi2-hw21-bouygues` profile keeps Fanboy's full UBI2 package selection
-and explicitly includes:
+The `ubi2-hw21-bouygues` profile deliberately does not inherit Fanboy's full
+demonstration package set. It stays close to the package and service surface
+already validated on the deployed router and explicitly includes:
 
 - `wpad-openssl` for the preserved 802.11k/v Wi-Fi configuration
 - `dnsmasq-full`
 - `dnsproxy` with DNS-over-QUIC support
+- `ethtool-full` for RTL8261CE link and PHY diagnostics
+- OpenSSL-backed APK, LuCI HTTPS and ustream TLS, without the duplicate
+  mbedTLS userspace stack; the OpenSSL legacy provider remains because full
+  `wpad-openssl` requires it for its EAP/RADIUS feature set
+- the existing Watchcat configuration, LuCI log viewer and SFTP server used by
+  the guarded Mac upgrade workflow
+- `arp-scan`, `fping` and `iperf3` for focused LAN/WAN diagnostics
 - a boot and WAN recovery service for dnsproxy and full wpad
+
+Generic Attended Sysupgrade and `owut` are intentionally omitted because they
+cannot reproduce this pinned custom patchset. The workflow also avoids
+`CONFIG_ALL_KMODS`; it validates all required device packages against the final
+image manifest instead.
+
+The generic `irqbalance`, `ttyd`, LuCI file manager, router-hosted speedtest,
+MLO/Wi-Fi 7 tuning panels and NPU overclock/configuration panel are also left
+out. They are not required by the current routed configuration; some would
+change a validated IRQ policy or expose additional privileged administration
+surfaces. FlowSense and the W1700K fan-control pages remain included.
+
+The log viewer is vendored from
+[`gSpotx2f/luci-app-log@69226866`](https://github.com/gSpotx2f/luci-app-log/commit/69226866b51f90c35390dfe57875d56d337d8b56),
+the exact source used by the active Gilly image. Its files and MIT license are
+covered by the profile source checksum lock. The later upstream `r3` is not
+used because it disables log-message HTML escaping while the renderer still
+uses `insertAdjacentHTML()`; the audited `r2` keeps that escaping in place.
+
+The inherited web CGI helpers that fetch generic `w1700k/builds` images are
+also removed. Upgrades for this profile go through the checksum-verified local
+workflow only; the unrelated single-wiphy LuCI display fix remains included.
+
+The image does not force the official buildbot kernel `vermagic` or expose a
+separate `/kmods/` repository. All required kernel modules are built with this
+patched kernel and embedded in the image. The target APK repository remains
+listed because OpenWrt publishes `wpad-openssl` there; it can also list kernel
+packages, but the native kernel ABI makes incompatible modules fail dependency
+resolution and the recovery command only requests named userspace packages.
+The restricted repository list is versioned with the profile and omits the
+unused telephony and video indexes; snapshot contents remain rolling by
+design. A dedicated cache epoch forces one clean target rebuild when this
+native-ABI policy is introduced, and assembled `root-*` trees are never
+carried between builds.
 
 The recovery policy configures AdGuard Unfiltered DoQ as primary, NextDNS DoQ
 as fallback, and DNS.SB port 53 addresses only as bootstrap/recovery resolvers.
+At first boot, the profile restores its audited recovery scripts from `/rom`
+before enabling them, so an older copy preserved by `/etc/sysupgrade.conf`
+cannot mask a fix in the new image. The recovery job uses a kernel-held
+`flock` lock that cannot remain stale after an interrupted process.
 
 No router backup, Wi-Fi credential, MAC address, DUID, public address, capture,
 or other device-specific configuration is stored in this repository.
@@ -46,20 +105,70 @@ only `ubi2-hw21-bouygues` and creates a prerelease containing:
 
 - the UBI2 sysupgrade ITB
 - the package manifest
+- the OpenWrt CycloneDX SBOM
 - `sha256sums`
 - `profiles.json`
 - the effective `config.diff`
 - source, feed and builder provenance in `build-info.txt`
 
 The workflow aborts if the checked-out OpenWrt commit differs from the pinned
-commit, if a feed differs from its lock, or if the selective patch is missing.
+commit, if a feed differs from its lock, or if any source overlay differs from
+`source-files.sha256`. Rootfs profile files and the profile hook are checked
+independently against `profile-files.sha256` and `profile-hooks.sha256`.
+Profile-level OpenWrt source patches are covered by
+`profile-patches.sha256`. It fetches the immutable source commit explicitly so
+a later UBI2 branch rebase cannot make a cached checkout accidentally
+determine the build result.
+The GitHub Actions and both upstream build/cache containers are pinned by
+immutable commit or image digest. No mutable incremental builder image is
+loaded or published; the selected container digest is recorded in
+`build-info.txt`. The inherited daily GHCR cleanup workflow is removed because
+this repository no longer publishes mutable builder images; keeping its broad
+write permission and unpinned actions would serve no purpose.
+Before publishing, it also inspects the assembled rootfs for the required
+drivers, firmware, recovery files and executable modes, and rejects generic
+kernel feeds or upgrade/download helpers.
+The workflow verifies that the published provenance is byte-for-byte identical
+to the `build_info` embedded in the rootfs. It creates a GitHub
+build-provenance attestation for the sysupgrade ITB, package manifest,
+CycloneDX SBOM, OpenWrt checksums/profile metadata, published provenance and
+effective configuration before publishing them. The image can be checked
+independently with
+`gh attestation verify IMAGE --repo arnaud-devops/w1700k-hw21-bouygues-build`.
 The complete staged output is also retained as a GitHub Actions artifact for
 14 days before release creation, so a publication error does not discard a
 successful firmware build.
 
-## Current candidate
+## Hardened candidate (untested on hardware)
 
-The first candidate was built successfully by
+The audited output from
+[workflow run 29362098839](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/29362098839)
+is published as the prerelease
+[`ubi2-hw21-bouygues_2026.07.14_r0+35356-7392ce326d_9e42ff1`](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.14_r0%2B35356-7392ce326d_9e42ff1).
+It is explicitly titled `[UNTESTED ON HW2.1 - DO NOT FLASH YET]`.
+
+The sysupgrade image is 20,104,015 bytes with SHA-256:
+
+```text
+c5a1ee53b1b009c8238a60829ed97a4ee402ef6de919aa11057cd7189cac1f65
+```
+
+The workflow compiled the image, validated the assembled rootfs, staged the
+release files and attested all seven intended assets. Its final publication
+gate produced a false negative because it expected the virtual package name
+`libustream-openssl`; the manifest correctly contains its current ABI package
+name `libustream-openssl20201210`. The unchanged workflow artifact was
+published manually, and the workflow now accepts the ABI-suffixed name.
+
+Both the CI artifact and the files downloaded from the release pass the
+independent workspace audit. Every public asset also passes GitHub attestation
+verification. This establishes reproducibility and offline integrity, not
+hardware approval: no image has been transferred to the router and the active
+Gilly build remains unchanged until an explicit flash decision.
+
+## First candidate (superseded; do not flash)
+
+The first candidate was built successfully before the 2026-07-14 hardening by
 [workflow run 29290389340](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/29290389340)
 and published as the prerelease
 [`ubi2-hw21-bouygues_2026.07.13_r0+35355-271d907218_3b43508`](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.13_r0%2B35355-271d907218_3b43508).
@@ -70,12 +179,13 @@ The sysupgrade image is 25,695,055 bytes and has SHA-256:
 1d7ca1959a5c2c8e83ff18219058567a7b53bc7c68bb262625bae241575d2074
 ```
 
-The release checksum, FIT contents, sysupgrade metadata, package manifest and
-extracted rootfs have been checked independently. The image contains the
-RTL8261CE module/firmware, MT7996/NPU firmware, `wpad-openssl`, `dnsproxy`,
-`dnsmasq-full`, and the exact recovery files from this repository. It has not
-yet been flashed on hardware and remains a candidate until post-sysupgrade
-WAN, LAN2, three-band Wi-Fi, DoQ and IPv4/IPv6 PPE tests pass.
+The release checksum, FIT contents, sysupgrade metadata and core network files
+were checked independently. A later package-policy review found that this
+image still inherited generic packages such as Attended Sysupgrade, `ttyd` and
+`irqbalance`, while omitting Watchcat, the deployed log viewer and the SFTP
+server used by the upgrade workflow. It must not be flashed. A newer lean
+candidate must pass both the package-policy checks and the same offline and
+hardware gates before replacing it.
 
 ## Validation before flashing
 

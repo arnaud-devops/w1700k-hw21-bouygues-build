@@ -1,0 +1,12 @@
+--- package/network/services/hostapd/Makefile
++++ package/network/services/hostapd/Makefile
+@@ -10,7 +10,7 @@
+ PKG_SOURCE_URL:=https://w1.fi/hostap.git
+ PKG_SOURCE_PROTO:=git
+ PKG_SOURCE_DATE:=2026-07-09
+ PKG_SOURCE_VERSION:=f08f2749aa696c4e47c5c0f591dda99951bf9fac
+-PKG_MIRROR_HASH:=skip
++PKG_MIRROR_HASH:=8b17bbe5c77c59a876d0b0ae037679c696713deab6de4a1d05e000a4d593153a
+ 
+ PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
+ PKG_LICENSE:=BSD-3-Clause

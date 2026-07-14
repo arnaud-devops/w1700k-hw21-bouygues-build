@@ -1,0 +1,2 @@
+27de2b8f4babda847f4366a39539839d7184395cbb52a69ce39d88a47d4a552c  ./patches/010-wifi-scripts-preserve-w1700k-6ghz-eht-behavior.patch
+a2646f05e1648d042a7238d6dba8cd14d107f2377037192d8d74e037a7eaaf66  ./patches/020-hostapd-pin-source-archive-hash.patch

@@ -1,0 +1,33 @@
+--- package/network/config/wifi-scripts/Makefile
++++ package/network/config/wifi-scripts/Makefile
+@@ -10,4 +10,4 @@
+ PKG_NAME:=wifi-scripts
+ PKG_VERSION:=1.0
+-PKG_RELEASE:=1
++PKG_RELEASE:=2
+ PKG_LICENSE:=GPL-2.0
+--- package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
++++ package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
+@@ -557,6 +557,8 @@ function iface_add(config, config_data)
+ 			config.auth_type = 'sae';
+ 		if (config.auth_type == 'eap-eap2')
+ 			config.auth_type = 'eap2';
++		/* Advertise the 6 GHz BSS directly for fast passive discovery. */
++		append('unsol_bcast_probe_resp_interval', 20);
+ 	}
+ 
+ 	if (config.auth_type in [ 'psk', 'psk-sae', 'psk-sae-compat' ] && data.config.band != '6g')
+--- package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc
++++ package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc
+@@ -454,6 +454,11 @@ function device_rates(config)
+ 
+ 		config.ieee80211be = true;
+ 
++		/* Default EHT beamforming on, then honor the capability gates below. */
++		config.eht_su_beamformer ??= 1;
++		config.eht_su_beamformee ??= 1;
++		config.eht_mu_beamformer ??= 1;
++
+ 		if (!(eht_phy_cap[0] & 0x20))
+ 			config.eht_su_beamformer = false;
+ 		if (!(eht_phy_cap[0] & 0x40))

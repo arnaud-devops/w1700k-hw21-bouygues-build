@@ -3,7 +3,7 @@
 set -u
 
 TAG="dnsproxy-restore"
-LOCK_DIR="/var/lock/dnsproxy-restore.lock"
+LOCK_FILE="/var/lock/dnsproxy-restore.lock"
 WAN_WAIT_ATTEMPTS="${WAN_WAIT_ATTEMPTS:-60}"
 WAN_WAIT_DELAY="${WAN_WAIT_DELAY:-5}"
 APK_ATTEMPTS="${APK_ATTEMPTS:-6}"
@@ -282,10 +282,6 @@ wait_for_dnsproxy_query() {
 	return 1
 }
 
-cleanup() {
-	rmdir "$LOCK_DIR" 2>/dev/null || true
-}
-
 ensure_dnsproxy() {
 	if [ "$mode" != "--force" ] && have_dnsproxy_files && dnsproxy_config_matches; then
 		/etc/init.d/dnsproxy enable
@@ -435,10 +431,8 @@ case "$mode" in
 esac
 
 mkdir -p /var/lock
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-	exit 0
-fi
-trap cleanup EXIT
+exec 9>"$LOCK_FILE"
+flock -n 9 || exit 0
 trap 'exit 1' HUP INT TERM
 
 dns_result=0
