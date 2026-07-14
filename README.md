@@ -43,6 +43,11 @@ cannot reproduce this pinned custom patchset. The workflow also avoids
 `CONFIG_ALL_KMODS`; it validates all required device packages against the final
 image manifest instead.
 
+The image does not force the official buildbot kernel `vermagic` and does not
+expose the generic OpenWrt `kmods` feed. All required kernel modules are built
+with this patched kernel and embedded in the image. The remaining userspace
+APK repository list is pinned with the profile.
+
 The recovery policy configures AdGuard Unfiltered DoQ as primary, NextDNS DoQ
 as fallback, and DNS.SB port 53 addresses only as bootstrap/recovery resolvers.
 
@@ -63,7 +68,8 @@ only `ubi2-hw21-bouygues` and creates a prerelease containing:
 
 The workflow aborts if the checked-out OpenWrt commit differs from the pinned
 commit, if a feed differs from its lock, or if any source overlay differs from
-`source-files.sha256`. It fetches the immutable source commit explicitly so a
+`source-files.sha256`. Profile files are independently checked against
+`profile-files.sha256`. It fetches the immutable source commit explicitly so a
 later UBI2 branch rebase cannot make a cached checkout accidentally determine
 the build result.
 The complete staged output is also retained as a GitHub Actions artifact for

@@ -1,0 +1,5 @@
+5c40f9b4afc36c4ad5ec222ea05674be892c54df0b01c465cc957b5f7380b014  ./etc/apk/repositories.d/distfeeds.list
+2687c4d55cb2a475a82f3731d2a4bd25c61c90b5ecd30bee8874acd42423fda2  ./etc/hotplug.d/iface/95-dnsproxy-restore
+409eb2833a97c5863e0c74f051a3c4b99360917205765420b8548d67cd7dab28  ./etc/init.d/dnsproxy-restore
+625e9e16020d985265fb8f3ad15d37b3599b1becd3d202872efec32243baf4f7  ./etc/uci-defaults/99-w1700k-hw21-bouygues
+7e4a57d7f21ca0089dae3346ffc8426802a987b3483fcf12bd8add38e7321f46  ./usr/local/sbin/restore-dnsproxy-after-sysupgrade
