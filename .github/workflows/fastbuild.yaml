@@ -140,11 +140,34 @@ jobs:
             done
           } | tee -a files/build_info $DK_BIN/build_info >/dev/null
           cp $bp/config.diff .config
-          shopt -s nullglob
-          for profile_patch in "$bp"/patches/*.patch; do
-            patch -d . -p0 --forward < "$profile_patch"
-          done
-          shopt -u nullglob
+          if [ -d "$bp/patches" ]; then
+            profile_patch_lock=$bp/profile-patches.sha256
+            [ -f "$profile_patch_lock" ] || {
+              echo "::error::Profile patch checksum lock is missing: $profile_patch_lock"
+              exit 1
+            }
+            profile_patch_actual=$(mktemp)
+            (
+              cd "$bp"
+              find ./patches -type f -print0 | sort -z | xargs -0 sha256sum
+            ) > "$profile_patch_actual"
+            if ! diff -u "$profile_patch_lock" "$profile_patch_actual"; then
+              echo "::error::Profile patches differ from profile-patches.sha256"
+              rm -f "$profile_patch_actual"
+              exit 1
+            fi
+            shopt -s nullglob
+            for profile_patch in "$bp"/patches/*.patch; do
+              patch -d . -p0 --forward < "$profile_patch"
+            done
+            shopt -u nullglob
+            {
+              echo
+              echo "Profile patch checksums:"
+              cat "$profile_patch_actual"
+            } | tee -a files/build_info $DK_BIN/build_info >/dev/null
+            rm -f "$profile_patch_actual"
+          fi
           if [ -d "$bp/files" ]; then
             profile_lock=$bp/profile-files.sha256
             [ -f "$profile_lock" ] || {
@@ -364,6 +387,21 @@ jobs:
             echo "::error::The stock dual-stack fw4 flow rule is missing"
             exit 1
           }
+          grep -Fq "append('unsol_bcast_probe_resp_interval', 20);" \
+            "$root/usr/share/ucode/wifi/ap.uc" || {
+            echo "::error::6 GHz in-band discovery is missing from wifi-scripts"
+            exit 1
+          }
+          for option in \
+            eht_su_beamformer \
+            eht_su_beamformee \
+            eht_mu_beamformer; do
+            grep -Fq "config.$option ??= 1;" \
+              "$root/usr/share/ucode/wifi/hostapd.uc" || {
+              echo "::error::EHT beamforming default is missing: $option"
+              exit 1
+            }
+          done
 
           for rel in \
             lib/firmware/airoha/en7581_MT7996_npu_data.bin \

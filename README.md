@@ -26,7 +26,9 @@ VLAN insertion. IPv4 and LAN-bound IPv6 remain eligible for PPE acceleration.
 The profile also carries a small, documented set of Airoha, thermal, GRO and
 mt7996 correctness fixes, including the upstream-proposed per-radio DT MAC
 export, a precise RTL8261CE model matcher derived from Gilly's universal tree,
-plus a serialized Wi-Fi flowtable hotplug handler.
+plus a serialized Wi-Fi flowtable hotplug handler. A profile-level source
+patch also preserves the active Gilly image's 6 GHz in-band discovery and EHT
+beamforming defaults in the actual `wifi-scripts` ucode files.
 The selection, upstream status and deliberately excluded experimental work are
 documented in [`AUDIT-2026-07-14.md`](AUDIT-2026-07-14.md).
 
@@ -81,9 +83,11 @@ only `ubi2-hw21-bouygues` and creates a prerelease containing:
 The workflow aborts if the checked-out OpenWrt commit differs from the pinned
 commit, if a feed differs from its lock, or if any source overlay differs from
 `source-files.sha256`. Rootfs profile files and the profile hook are checked
-independently against `profile-files.sha256` and `profile-hooks.sha256`. It
-fetches the immutable source commit explicitly so a later UBI2 branch rebase
-cannot make a cached checkout accidentally determine the build result.
+independently against `profile-files.sha256` and `profile-hooks.sha256`.
+Profile-level OpenWrt source patches are covered by
+`profile-patches.sha256`. It fetches the immutable source commit explicitly so
+a later UBI2 branch rebase cannot make a cached checkout accidentally
+determine the build result.
 Before publishing, it also inspects the assembled rootfs for the required
 drivers, firmware, recovery files and executable modes, and rejects generic
 kernel feeds or upgrade/download helpers.
