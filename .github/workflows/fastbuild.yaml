@@ -3,7 +3,7 @@ on: workflow_dispatch
 permissions:
   actions: write
   contents: write
-  packages: write
+  packages: read
 jobs:
   build:
     name: Build ${{ matrix.target }}
@@ -16,25 +16,26 @@ jobs:
       DK_PROFILE: /bld/user/current
       GH_TOKEN: ${{ github.token }}
       CACHE_EPOCH: native-abi-v1
-      IMG_INC: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ matrix.target }}-native-abi-v1-inc
+      BUILDER_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:cd751ad00ac9b994b503947f8cb9056ad9a3b15652b629784852b21e0fe66fd5
+      CACHE_SEED_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:1c116f8db4cde4efd79b0c0123de0eb013f1ad51092f7b711568c812187fc9c4
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-    - uses: docker/login-action@v4
+    - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
       with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ github.token }}'}
 
     - id: gh
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
       with: {path: "ghcache\nstcache", key: 'cache-${{ matrix.target }}.native-abi-v1.${{ github.run_id }}', restore-keys: 'cache-${{ matrix.target }}.native-abi-v1.'}
     - id: dl
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
       with: {path: dlcache, key: 'dlcache.${{ github.run_id }}', restore-keys: dlcache.}
 
     - name: Seed caches if missing
       run: |
         mkdir -p openwrt_bin ghcache stcache dlcache
         if [ -z "$(ls -A ghcache 2>&-)" ] || [ -z "$(ls -A stcache 2>&-)" ]; then
-          I=ghcr.io/w1700k/fastbuild_base:base-bldcache-ubi2
+          I=$CACHE_SEED_IMAGE
           if docker pull "$I" 2>&-; then
             docker create --name CA "$I" >/dev/null
             for dir in ghcache stcache dlcache; do
@@ -60,11 +61,8 @@ jobs:
         echo 'CONFIG_CCACHE_DIR="/ghcache"' >> user/current/config.diff
         sudo tee /etc/docker/daemon.json <<< '{"max-concurrent-downloads":50,"max-concurrent-uploads":50,"experimental":true}'
         sudo systemctl reload docker
-        IMAGE=$IMG_INC
-        if ! docker pull "$IMAGE" 2>&-; then
-          IMAGE=ghcr.io/w1700k/fastbuild_base:base-builder
-          docker pull "$IMAGE"
-        fi
+        IMAGE=$BUILDER_IMAGE
+        docker pull "$IMAGE"
         docker run -dt --name DK -v "$PWD/user:$DK_USER" -v "$PWD/openwrt_bin:$DK_BIN" -v "$PWD/ghcache:/ghcache" -v "$PWD/stcache:/stcache" -v "$PWD/dlcache:/dlcache" "$IMAGE"
         install -m 755 /dev/stdin /usr/local/bin/docker_exec <<'DKR'
         #!/bin/bash
@@ -74,6 +72,7 @@ jobs:
 
     - name: Prepare OpenWrt source
       run: |
+        # shellcheck disable=SC2016
         docker_exec DK bash -e -c '
           . $DK_USER/default/settings.ini &>/dev/null ||:
           . $DK_PROFILE/settings.ini
@@ -100,6 +99,7 @@ jobs:
           {
             echo "Builder repository: ${{ github.server_url }}/${{ github.repository }}"
             echo "Builder commit: ${{ github.sha }}"
+            echo "Builder container: ${{ env.BUILDER_IMAGE }}"
             echo "OpenWrt repository: $REPO_URL"
             echo "OpenWrt branch: $REPO_BRANCH"
             echo "OpenWrt commit: $(git rev-parse HEAD)"
@@ -311,6 +311,7 @@ jobs:
       run: |
         build_succeeded=false
         for mode in c s; do
+          # shellcheck disable=SC2016
           if docker_exec -e MODE=$mode DK bash -c '
             bash $DK_PROFILE/pre_compile.sh 2>&- ||:
             cd $DK_OPENWRT || exit 1
@@ -445,7 +446,7 @@ jobs:
         echo "Staged firmware files:"
         find firmware -maxdepth 1 -type f -printf '%f\n' | sort
 
-    - uses: actions/upload-artifact@v7
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
       with:
         name: firmware-${{ matrix.target }}-${{ github.run_id }}
         path: firmware/
@@ -534,12 +535,6 @@ jobs:
         assets=("${images[@]}" "${manifests[@]}" firmware/sha256sums firmware/profiles.json firmware/build-info.txt firmware/config.diff)
         gh release create "$VERSION" "${assets[@]}" --prerelease --title "$VERSION" --notes-file firmware/release-notes.txt
 
-    - name: Upload builder container
-      run: |
-        docker_exec DK bash -c 'cd $DK_OPENWRT && rm -rf bin build_dir feeds tmp'
-        docker commit -a openwrt-fastbuild -m "Building at $(date)" DK $IMG_INC
-        docker push $IMG_INC
-
     - name: Delete old caches
       if: always()
       run: |
@@ -547,9 +542,9 @@ jobs:
           gh cache list --json key,id --jq '.[] | select(.key | startswith("'"$p"'")) | .id' | xargs -r gh cache delete
         done ||:
 
-    - uses: actions/cache/save@v5
+    - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
       if: always()
       with: {path: "ghcache\nstcache", key: '${{ steps.gh.outputs.cache-primary-key }}'}
-    - uses: actions/cache/save@v5
+    - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
       if: always()
       with: {path: dlcache, key: '${{ steps.dl.outputs.cache-primary-key }}'}

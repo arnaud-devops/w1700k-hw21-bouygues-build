@@ -88,6 +88,10 @@ Profile-level OpenWrt source patches are covered by
 `profile-patches.sha256`. It fetches the immutable source commit explicitly so
 a later UBI2 branch rebase cannot make a cached checkout accidentally
 determine the build result.
+The GitHub Actions and both upstream build/cache containers are pinned by
+immutable commit or image digest. No mutable incremental builder image is
+loaded or published; the selected container digest is recorded in
+`build-info.txt`.
 Before publishing, it also inspects the assembled rootfs for the required
 drivers, firmware, recovery files and executable modes, and rejects generic
 kernel feeds or upgrade/download helpers.
