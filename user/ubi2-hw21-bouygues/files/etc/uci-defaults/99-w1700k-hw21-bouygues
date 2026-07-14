@@ -52,6 +52,7 @@ if [ -f /etc/sysupgrade.conf ] &&
 	rm -f "$tmp_sysupgrade_conf"
 fi
 
+/etc/init.d/dnsproxy-restore disable
 /etc/init.d/dnsproxy-restore enable
 
 exit 0

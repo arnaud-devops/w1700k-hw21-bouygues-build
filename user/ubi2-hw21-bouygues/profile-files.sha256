@@ -7,7 +7,7 @@
 409eb2833a97c5863e0c74f051a3c4b99360917205765420b8548d67cd7dab28  ./etc/init.d/dnsproxy-restore
 e57c8c3fa7d8b8b493950649b5e82df4236986c38bf80a3d3237a6178dfa3721  ./etc/md.sh
 bec2c6fba5ae9ca936f5f1597e57fed9c941ca1e19694b818d2e076ecc75eec0  ./etc/testgpio.sh
-a24de19562d691f6a66dfc8404eabeea72355655cad8fccd2ab38cd18716d343  ./etc/uci-defaults/99-w1700k-hw21-bouygues
+459597ece6a8f43c9ec695a9466ffbcde8a0a18d95d4cba0da5176a1318d5a8b  ./etc/uci-defaults/99-w1700k-hw21-bouygues
 817161ae569b00f3ac231f3f7e7b7368e2cc6c7ee3d48643a489a0561bd46483  ./etc/xsi_mac_dbg.sh
 b7a5c29ab7699ac095a6d6c88b3358d1d0c925c96983fb850b365b5ed90bead8  ./overview.js
 864bec1ec283f1bb2bc7df4781ec5ccac28c77d62d754b208a098b8c45084c45  ./usr/local/sbin/restore-dnsproxy-after-sysupgrade
