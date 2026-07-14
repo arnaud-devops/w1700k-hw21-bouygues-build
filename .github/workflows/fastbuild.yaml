@@ -336,9 +336,12 @@ jobs:
           download_status=${PIPESTATUS[0]}
           set -e
           if [ "$download_status" -ne 0 ] || grep -q "ERROR:" "$download_log"; then
-            echo "::error::OpenWrt source download failed"
-            rm -f "$download_log"
-            exit 1
+            echo "::warning::Parallel source download failed; retrying serially with verbose output"
+            if ! make download -j1 V=s; then
+              echo "::error::OpenWrt source download failed after the verbose retry"
+              rm -f "$download_log"
+              exit 1
+            fi
           fi
           rm -f "$download_log"
         '
