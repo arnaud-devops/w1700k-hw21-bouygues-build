@@ -171,7 +171,7 @@ jobs:
             } | tee -a files/build_info $DK_BIN/build_info >/dev/null
             rm -f "$profile_patch_actual"
           fi
-          hostapd_hash=c1a978092c8a6e43a9e1bd47e1f334637b9c4969ca741c30ff45c24539132ca4
+          hostapd_hash=8b17bbe5c77c59a876d0b0ae037679c696713deab6de4a1d05e000a4d593153a
           if ! grep -qx "PKG_MIRROR_HASH:=$hostapd_hash" \
             package/network/services/hostapd/Makefile; then
             echo "::error::The hostapd source archive is not locked to the audited SHA-256"
@@ -344,6 +344,17 @@ jobs:
             fi
           fi
           rm -f "$download_log"
+          hostapd_archive=dl/hostapd-2026.07.09~f08f2749.tar.zst
+          [ -f "$hostapd_archive" ] || {
+            echo "::error::The pinned hostapd source archive was not produced"
+            exit 1
+          }
+          actual_hostapd_hash=$(sha256sum "$hostapd_archive")
+          actual_hostapd_hash=${actual_hostapd_hash%% *}
+          if [ "$actual_hostapd_hash" != "$hostapd_hash" ]; then
+            echo "::error::Hostapd archive hash is $actual_hostapd_hash, expected $hostapd_hash"
+            exit 1
+          fi
         '
 
     - name: Compile OpenWrt
