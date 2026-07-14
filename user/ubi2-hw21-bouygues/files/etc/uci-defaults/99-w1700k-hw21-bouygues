@@ -8,6 +8,24 @@ append_sysupgrade_path() {
 		printf '%s\n' "$path" >> /etc/sysupgrade.conf
 }
 
+restore_managed_file() {
+	path="$1"
+	mode="$2"
+	rom_path="/rom$path"
+
+	[ -f "$rom_path" ] || return 0
+	mkdir -p "${path%/*}"
+	cp -f "$rom_path" "$path"
+	chmod "$mode" "$path"
+}
+
+# These files are kept across generic sysupgrades so they can reinstall
+# dnsproxy/full wpad. A preserved older copy otherwise masks an updated copy
+# shipped by this profile, so make the current image authoritative here.
+restore_managed_file /usr/local/sbin/restore-dnsproxy-after-sysupgrade 0755
+restore_managed_file /etc/init.d/dnsproxy-restore 0755
+restore_managed_file /etc/hotplug.d/iface/95-dnsproxy-restore 0755
+
 append_sysupgrade_path /usr/local/sbin/restore-dnsproxy-after-sysupgrade
 append_sysupgrade_path /etc/init.d/dnsproxy-restore
 append_sysupgrade_path /etc/hotplug.d/iface/95-dnsproxy-restore

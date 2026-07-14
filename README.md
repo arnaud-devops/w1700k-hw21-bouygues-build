@@ -57,6 +57,10 @@ one clean target rebuild when this native-ABI policy is introduced.
 
 The recovery policy configures AdGuard Unfiltered DoQ as primary, NextDNS DoQ
 as fallback, and DNS.SB port 53 addresses only as bootstrap/recovery resolvers.
+At first boot, the profile restores its audited recovery scripts from `/rom`
+before enabling them, so an older copy preserved by `/etc/sysupgrade.conf`
+cannot mask a fix in the new image. The recovery job uses a kernel-held
+`flock` lock that cannot remain stale after an interrupted process.
 
 No router backup, Wi-Fi credential, MAC address, DUID, public address, capture,
 or other device-specific configuration is stored in this repository.
