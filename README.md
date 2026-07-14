@@ -43,7 +43,8 @@ already validated on the deployed router and explicitly includes:
 - `dnsproxy` with DNS-over-QUIC support
 - `ethtool-full` for RTL8261CE link and PHY diagnostics
 - OpenSSL-backed APK, LuCI HTTPS and ustream TLS, without the duplicate
-  mbedTLS userspace stack or OpenSSL legacy provider
+  mbedTLS userspace stack; the OpenSSL legacy provider remains because full
+  `wpad-openssl` requires it for its EAP/RADIUS feature set
 - the existing Watchcat configuration, LuCI log viewer and SFTP server used by
   the guarded Mac upgrade workflow
 - `arp-scan`, `fping` and `iperf3` for focused LAN/WAN diagnostics
@@ -63,7 +64,9 @@ surfaces. FlowSense and the W1700K fan-control pages remain included.
 The log viewer is vendored from
 [`gSpotx2f/luci-app-log@69226866`](https://github.com/gSpotx2f/luci-app-log/commit/69226866b51f90c35390dfe57875d56d337d8b56),
 the exact source used by the active Gilly image. Its files and MIT license are
-covered by the profile source checksum lock.
+covered by the profile source checksum lock. The later upstream `r3` is not
+used because it disables log-message HTML escaping while the renderer still
+uses `insertAdjacentHTML()`; the audited `r2` keeps that escaping in place.
 
 The inherited web CGI helpers that fetch generic `w1700k/builds` images are
 also removed. Upgrades for this profile go through the checksum-verified local

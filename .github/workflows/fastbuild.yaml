@@ -289,6 +289,7 @@ jobs:
             echo "::error::The full wpad package would conflict with wpad-basic-mbedtls"
             exit 1
           }
+          forbidden_found=0
           for forbidden_option in \
             CONFIG_ALL_KMODS \
             CONFIG_PACKAGE_apk-mbedtls \
@@ -297,7 +298,6 @@ jobs:
             CONFIG_PACKAGE_curl \
             CONFIG_PACKAGE_fastfetch \
             CONFIG_PACKAGE_irqbalance \
-            CONFIG_PACKAGE_libopenssl-legacy \
             CONFIG_PACKAGE_librespeed-go \
             CONFIG_PACKAGE_libustream-mbedtls \
             CONFIG_PACKAGE_luci-app-airoha-npu \
@@ -314,9 +314,10 @@ jobs:
             CONFIG_PACKAGE_ttyd; do
             if grep -qx "$forbidden_option=y" .config; then
               echo "::error::Forbidden build option is enabled: $forbidden_option"
-              exit 1
+              forbidden_found=1
             fi
           done
+          [ "$forbidden_found" -eq 0 ] || exit 1
           ./scripts/diffconfig.sh > $DK_BIN/config.diff
           echo "CONFIG_VERSION_NUMBER=${{ matrix.target }}" >> .config
           download_log=$(mktemp)
@@ -524,6 +525,7 @@ jobs:
               iperf3 \
               kmod-mt7996e \
               kmod-phy-rtl8261ce \
+              libopenssl-legacy \
               libustream-openssl \
               luci-app-airoha-flowsense \
               luci-app-log-viewer \
@@ -551,7 +553,6 @@ jobs:
             fastfetch \
             irqbalance \
             libcurl4 \
-            libopenssl-legacy \
             librespeed-go \
             libustream-mbedtls \
             luci-app-airoha-npu \

@@ -5,7 +5,7 @@ cbd2035cbd528120a9a993381d65531bf6e8fa2922bc34e40509438f42599864  ./package/kern
 a2179d91d36a43a29e35976c93ed12f907e2aa1e38e0e2116ba9eac46b36fd2e  ./package/kernel/mt76/patches/019-wifi-mt76-mt7996-guard-truncated-tx-free.patch
 0df0bb8c9f3ff6d5a7f7c414294d02e2e64c1fdeb10646b34bc2e297173e3e24  ./package/luci-app-log-viewer/LICENSE
 4862d85808c59362798687f8a4c64443606b32f83895879047c714b4bd392576  ./package/luci-app-log-viewer/Makefile
-0bd38265dd955820f07ac28d36a89f93a83f3e8d282ff074b70fe69fce0350ea  ./package/luci-app-log-viewer/UPSTREAM.md
+625e88fce8233aaaa846bad0d3a033525945d63bc6bca14c4fc067872e012d61  ./package/luci-app-log-viewer/UPSTREAM.md
 3c8180e44173f9ce8f5172fc598b2b5694393c424ea85d701445bdd24aaa3392  ./package/luci-app-log-viewer/htdocs/luci-static/resources/view/log-viewer/dmesg.js
 3beacb61c6e85c0110cc9318054e9865bebbdf35e84fc3777073b05214a6c290  ./package/luci-app-log-viewer/htdocs/luci-static/resources/view/log-viewer/log-base.js
 eedd136e96f9c7ff1247505a712f9e1501b7c54d5a413c3294b9c38722a6934f  ./package/luci-app-log-viewer/htdocs/luci-static/resources/view/log-viewer/log-system.js
