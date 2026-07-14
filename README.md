@@ -120,8 +120,11 @@ write permission and unpinned actions would serve no purpose.
 Before publishing, it also inspects the assembled rootfs for the required
 drivers, firmware, recovery files and executable modes, and rejects generic
 kernel feeds or upgrade/download helpers.
-The workflow creates a GitHub build-provenance attestation for the sysupgrade
-ITB before publishing it. It can be checked independently with
+The workflow verifies that the published provenance is byte-for-byte identical
+to the `build_info` embedded in the rootfs. It creates a GitHub
+build-provenance attestation for the sysupgrade ITB, CycloneDX SBOM, published
+provenance and effective configuration before publishing them. The image can
+be checked independently with
 `gh attestation verify IMAGE --repo arnaud-devops/w1700k-hw21-bouygues-build`.
 The complete staged output is also retained as a GitHub Actions artifact for
 14 days before release creation, so a publication error does not discard a
