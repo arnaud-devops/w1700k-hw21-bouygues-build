@@ -4,7 +4,7 @@
 514c008a14adf322c1655617a7741272b3054e94efd487c0009c945b1a437063  ./etc/fe_reg.sh
 92fd8c625849b97b722db9cff2fcc2b8b7f6cc1cb18b8e653f44d4742efe0224  ./etc/gsw_status.sh
 2687c4d55cb2a475a82f3731d2a4bd25c61c90b5ecd30bee8874acd42423fda2  ./etc/hotplug.d/iface/95-dnsproxy-restore
-409eb2833a97c5863e0c74f051a3c4b99360917205765420b8548d67cd7dab28  ./etc/init.d/dnsproxy-restore
+d2796ce57acb0549bde760836bc5104b7853cb2f6e8f5170c416f81b95452e24  ./etc/init.d/dnsproxy-restore
 e57c8c3fa7d8b8b493950649b5e82df4236986c38bf80a3d3237a6178dfa3721  ./etc/md.sh
 bec2c6fba5ae9ca936f5f1597e57fed9c941ca1e19694b818d2e076ecc75eec0  ./etc/testgpio.sh
 459597ece6a8f43c9ec695a9466ffbcde8a0a18d95d4cba0da5176a1318d5a8b  ./etc/uci-defaults/99-w1700k-hw21-bouygues

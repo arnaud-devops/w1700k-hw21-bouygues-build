@@ -34,19 +34,36 @@ documented in [`AUDIT-2026-07-14.md`](AUDIT-2026-07-14.md).
 
 ## Included profile
 
-The `ubi2-hw21-bouygues` profile keeps Fanboy's full UBI2 package selection
-and explicitly includes:
+The `ubi2-hw21-bouygues` profile deliberately does not inherit Fanboy's full
+demonstration package set. It stays close to the package and service surface
+already validated on the deployed router and explicitly includes:
 
 - `wpad-openssl` for the preserved 802.11k/v Wi-Fi configuration
 - `dnsmasq-full`
 - `dnsproxy` with DNS-over-QUIC support
 - `ethtool-full` for RTL8261CE link and PHY diagnostics
+- OpenSSL-backed APK, LuCI HTTPS and ustream TLS, without the duplicate
+  mbedTLS userspace stack or OpenSSL legacy provider
+- the existing Watchcat configuration, LuCI log viewer and SFTP server used by
+  the guarded Mac upgrade workflow
+- `arp-scan`, `fping` and `iperf3` for focused LAN/WAN diagnostics
 - a boot and WAN recovery service for dnsproxy and full wpad
 
 Generic Attended Sysupgrade and `owut` are intentionally omitted because they
 cannot reproduce this pinned custom patchset. The workflow also avoids
 `CONFIG_ALL_KMODS`; it validates all required device packages against the final
 image manifest instead.
+
+The generic `irqbalance`, `ttyd`, LuCI file manager, router-hosted speedtest,
+MLO/Wi-Fi 7 tuning panels and NPU overclock/configuration panel are also left
+out. They are not required by the current routed configuration; some would
+change a validated IRQ policy or expose additional privileged administration
+surfaces. FlowSense and the W1700K fan-control pages remain included.
+
+The log viewer is vendored from
+[`gSpotx2f/luci-app-log@69226866`](https://github.com/gSpotx2f/luci-app-log/commit/69226866b51f90c35390dfe57875d56d337d8b56),
+the exact source used by the active Gilly image. Its files and MIT license are
+covered by the profile source checksum lock.
 
 The inherited web CGI helpers that fetch generic `w1700k/builds` images are
 also removed. Upgrades for this profile go through the checksum-verified local
@@ -91,7 +108,9 @@ determine the build result.
 The GitHub Actions and both upstream build/cache containers are pinned by
 immutable commit or image digest. No mutable incremental builder image is
 loaded or published; the selected container digest is recorded in
-`build-info.txt`.
+`build-info.txt`. The inherited daily GHCR cleanup workflow is removed because
+this repository no longer publishes mutable builder images; keeping its broad
+write permission and unpinned actions would serve no purpose.
 Before publishing, it also inspects the assembled rootfs for the required
 drivers, firmware, recovery files and executable modes, and rejects generic
 kernel feeds or upgrade/download helpers.
@@ -99,7 +118,7 @@ The complete staged output is also retained as a GitHub Actions artifact for
 14 days before release creation, so a publication error does not discard a
 successful firmware build.
 
-## First candidate (superseded for further testing)
+## First candidate (superseded; do not flash)
 
 The first candidate was built successfully before the 2026-07-14 hardening by
 [workflow run 29290389340](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/29290389340)
@@ -112,13 +131,13 @@ The sysupgrade image is 25,695,055 bytes and has SHA-256:
 1d7ca1959a5c2c8e83ff18219058567a7b53bc7c68bb262625bae241575d2074
 ```
 
-The release checksum, FIT contents, sysupgrade metadata, package manifest and
-extracted rootfs have been checked independently. The image contains the
-RTL8261CE module/firmware, MT7996/NPU firmware, `wpad-openssl`, `dnsproxy`,
-`dnsmasq-full`, and the exact recovery files from this repository. It has not
-yet been flashed on hardware and remains a candidate until post-sysupgrade
-WAN, LAN2, three-band Wi-Fi, DoQ and IPv4/IPv6 PPE tests pass. A newer hardened
-candidate must pass the same offline and hardware gates before replacing it.
+The release checksum, FIT contents, sysupgrade metadata and core network files
+were checked independently. A later package-policy review found that this
+image still inherited generic packages such as Attended Sysupgrade, `ttyd` and
+`irqbalance`, while omitting Watchcat, the deployed log viewer and the SFTP
+server used by the upgrade workflow. It must not be flashed. A newer lean
+candidate must pass both the package-policy checks and the same offline and
+hardware gates before replacing it.
 
 ## Validation before flashing
 

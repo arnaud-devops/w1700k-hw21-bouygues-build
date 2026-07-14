@@ -265,9 +265,16 @@ jobs:
           for option in \
             CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi=y \
             CONFIG_JSON_OVERVIEW_IMAGE_INFO=y \
+            CONFIG_PACKAGE_apk-openssl=y \
             CONFIG_PACKAGE_dnsmasq-full=y \
             CONFIG_PACKAGE_dnsproxy=y \
             CONFIG_PACKAGE_ethtool-full=y \
+            CONFIG_PACKAGE_libustream-openssl=y \
+            CONFIG_PACKAGE_luci-app-log-viewer=y \
+            CONFIG_PACKAGE_luci-app-watchcat=y \
+            CONFIG_PACKAGE_luci-ssl-openssl=y \
+            CONFIG_PACKAGE_openssh-sftp-server=y \
+            CONFIG_PACKAGE_watchcat=y \
             CONFIG_PACKAGE_wpad-openssl=y; do
             grep -qx "$option" .config || {
               echo "::error::Required build option is missing: $option"
@@ -284,9 +291,27 @@ jobs:
           }
           for forbidden_option in \
             CONFIG_ALL_KMODS \
+            CONFIG_PACKAGE_apk-mbedtls \
             CONFIG_PACKAGE_attendedsysupgrade-common \
+            CONFIG_PACKAGE_ca-certificates \
+            CONFIG_PACKAGE_curl \
+            CONFIG_PACKAGE_fastfetch \
+            CONFIG_PACKAGE_irqbalance \
+            CONFIG_PACKAGE_libopenssl-legacy \
+            CONFIG_PACKAGE_librespeed-go \
+            CONFIG_PACKAGE_libustream-mbedtls \
+            CONFIG_PACKAGE_luci-app-airoha-npu \
             CONFIG_PACKAGE_luci-app-attendedsysupgrade \
-            CONFIG_PACKAGE_owut; do
+            CONFIG_PACKAGE_luci-app-filemanager \
+            CONFIG_PACKAGE_luci-app-irqbalance \
+            CONFIG_PACKAGE_luci-app-mlo \
+            CONFIG_PACKAGE_luci-app-netspeedtest \
+            CONFIG_PACKAGE_luci-app-ttyd \
+            CONFIG_PACKAGE_luci-app-wifi7 \
+            CONFIG_PACKAGE_luci-proto-relay \
+            CONFIG_PACKAGE_owut \
+            CONFIG_PACKAGE_relayd \
+            CONFIG_PACKAGE_ttyd; do
             if grep -qx "$forbidden_option=y" .config; then
               echo "::error::Forbidden build option is enabled: $forbidden_option"
               exit 1
@@ -357,9 +382,12 @@ jobs:
           for rel in \
             etc/hotplug.d/iface/95-dnsproxy-restore \
             etc/init.d/dnsproxy-restore \
+            etc/init.d/watchcat \
             etc/uci-defaults/99-w1700k-hw21-bouygues \
             usr/local/sbin/restore-dnsproxy-after-sysupgrade \
+            usr/bin/watchcat.sh \
             usr/bin/flock \
+            usr/libexec/sftp-server \
             usr/sbin/ethtool \
             usr/sbin/wpad; do
             [ -x "$root/$rel" ] || {
@@ -369,12 +397,29 @@ jobs:
           done
 
           for rel in \
+            etc/init.d/irqbalance \
+            etc/init.d/ttyd \
             etc/vermagic.txt \
+            usr/bin/curl \
+            usr/bin/fastfetch \
+            usr/bin/ttyd \
             www/cgi-bin/github_check \
             www/cgi-bin/github_fetch \
-            www/luci-static/resources/view/attendedsysupgrade; do
+            www/luci-static/resources/view/attendedsysupgrade \
+            www/luci-static/resources/view/filemanager \
+            www/luci-static/resources/view/ttyd; do
             [ ! -e "$root/$rel" ] || {
               echo "::error::Forbidden path is present in the rootfs: $rel"
+              exit 1
+            }
+          done
+          for rel in \
+            usr/share/luci/menu.d/luci-app-log-viewer.json \
+            usr/share/luci/menu.d/luci-app-watchcat.json \
+            usr/share/rpcd/ucode/luci.log-viewer \
+            www/luci-static/resources/view/watchcat.js; do
+            [ -s "$root/$rel" ] || {
+              echo "::error::Required administration file is missing: $rel"
               exit 1
             }
           done
@@ -466,26 +511,61 @@ jobs:
           echo "::error::No package manifest was produced"
           exit 1
         fi
-        for manifest in "${manifests[@]}"; do
-          for package in \
-            airoha-en7581-mt7996-npu-firmware \
-            dnsmasq-full \
-            dnsproxy \
-            ethtool-full \
-            kmod-mt7996e \
-            kmod-phy-rtl8261ce \
-            rtl826x-firmware \
-            wpad-openssl; do
+          for manifest in "${manifests[@]}"; do
+            for package in \
+              airoha-en7581-mt7996-npu-firmware \
+              apk-openssl \
+              arp-scan \
+              ca-bundle \
+              dnsmasq-full \
+              dnsproxy \
+              ethtool-full \
+              fping \
+              iperf3 \
+              kmod-mt7996e \
+              kmod-phy-rtl8261ce \
+              libustream-openssl \
+              luci-app-airoha-flowsense \
+              luci-app-log-viewer \
+              luci-app-package-manager \
+              luci-app-watchcat \
+              luci-app-w1700k-fancontrol \
+              luci-ssl-openssl \
+              nano \
+              openssl-util \
+              openssh-sftp-server \
+              rtl826x-firmware \
+              watchcat \
+              wpad-openssl; do
             grep -q "^$package - " "$manifest" || {
               echo "::error::Required package is absent from $manifest: $package"
               exit 1
             }
           done
           for package in \
+            apk-mbedtls \
             attendedsysupgrade-common \
+            ca-certificates \
+            curl \
             dnsmasq \
+            fastfetch \
+            irqbalance \
+            libcurl4 \
+            libopenssl-legacy \
+            librespeed-go \
+            libustream-mbedtls \
+            luci-app-airoha-npu \
             luci-app-attendedsysupgrade \
-            owut; do
+            luci-app-filemanager \
+            luci-app-irqbalance \
+            luci-app-mlo \
+            luci-app-netspeedtest \
+            luci-app-ttyd \
+            luci-app-wifi7 \
+            luci-proto-relay \
+            owut \
+            relayd \
+            ttyd; do
             if grep -q "^$package - " "$manifest"; then
               echo "::error::Forbidden package is present in $manifest: $package"
               exit 1
