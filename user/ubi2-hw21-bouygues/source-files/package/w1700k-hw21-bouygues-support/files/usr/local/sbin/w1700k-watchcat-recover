@@ -1,0 +1,31 @@
+#!/bin/sh
+
+set -u
+
+TAG="w1700k-watchcat"
+LOCK_FILE="/var/lock/w1700k-watchcat-recover.lock"
+network="${1:-}"
+network="${network#@}"
+
+case "$network" in
+	wan|wan6)
+		;;
+	*)
+		logger -t "$TAG" "refusing unsupported interface: ${network:-empty}"
+		exit 2
+		;;
+esac
+
+mkdir -p /var/lock
+exec 9>"$LOCK_FILE"
+flock 9
+
+logger -t "$TAG" "restarting logical interface $network after sustained reachability failure"
+ifdown "$network" >/dev/null 2>&1 || true
+sleep 3
+if ! ifup "$network" >/dev/null 2>&1; then
+	logger -t "$TAG" "failed to bring logical interface $network back up"
+	exit 1
+fi
+
+logger -t "$TAG" "logical interface $network restart requested"

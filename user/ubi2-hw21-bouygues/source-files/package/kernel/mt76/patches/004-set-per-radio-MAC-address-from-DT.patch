@@ -3,12 +3,12 @@ Date: Sat, 13 Jun 2026 00:00:00 +0000
 Subject: [PATCH] wifi: mt7996: set per-radio MAC address from DT
 
 During testing, it was noted that mt7996 did not properly apply the
-`mac-address` assigned to it from DT; however, they were already being
-read from DT by `of_get_mac_address`.
+`mac-address` assigned to it from DT; however, they were already
+being read from DT by `of_get_mac_address`.
 
-Patch the mt7996 driver to copy the DT assigned per-band macaddr into
-`wiphy->addresses[]`, indexed by radio, so userspace gets the per-radio
-address instead of deriving one.
+Patch the mt7996 driver to copy the DT assigned per-band macaddr
+into `wiphy->addresses[]`, indexed by radio, so userspace gets
+the per-radio address instead of deriving one.
 
 Fixes: openwrt#23578
 Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>

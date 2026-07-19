@@ -1,6 +1,6 @@
 CONFIG_TARGET_airoha=y
 CONFIG_TARGET_airoha_an7581=y
-CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi=y
+CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi2=y
 CONFIG_DEVEL=y
 CONFIG_TOOLCHAINOPTS=y
 CONFIG_BUSYBOX_CUSTOM=y
@@ -18,30 +18,61 @@ CONFIG_OPENSSL_WITH_ASM=y
 CONFIG_OPENSSL_WITH_CHACHA_POLY1305=y
 CONFIG_OPENSSL_WITH_ERROR_MESSAGES=y
 CONFIG_OPENSSL_WITH_TLS13=y
+# CONFIG_LIBCURL_MBEDTLS is not set
+CONFIG_LIBCURL_OPENSSL=y
 # CONFIG_PACKAGE_apk-mbedtls is not set
 CONFIG_PACKAGE_apk-openssl=y
 CONFIG_PACKAGE_arp-scan=y
 CONFIG_PACKAGE_ca-bundle=y
+CONFIG_PACKAGE_curl=y
+CONFIG_PACKAGE_debugfs=y
 CONFIG_PACKAGE_dnsmasq-full=y
 CONFIG_PACKAGE_dnsproxy=y
 CONFIG_PACKAGE_ethtool-full=y
 CONFIG_PACKAGE_fping=y
 CONFIG_PACKAGE_iperf3=y
+CONFIG_PACKAGE_ip-bridge=y
+CONFIG_PACKAGE_ip-full=y
+CONFIG_PACKAGE_irqbalance=y
+CONFIG_PACKAGE_jq=y
+CONFIG_PACKAGE_kmod-br-netfilter=y
+CONFIG_PACKAGE_kmod-crypto-hw-eip93=y
+CONFIG_PACKAGE_kmod-ifb=y
+CONFIG_PACKAGE_kmod-sched-bpf=y
+CONFIG_PACKAGE_kmod-sched-cake=y
+CONFIG_PACKAGE_kmod-sched-core=y
+CONFIG_PACKAGE_kmod-sched-flower=y
+CONFIG_PACKAGE_kmod-wireguard=y
 # CONFIG_PACKAGE_libustream-mbedtls is not set
 CONFIG_PACKAGE_libustream-openssl=y
 CONFIG_PACKAGE_luci-app-airoha-flowsense=y
+CONFIG_PACKAGE_luci-app-airoha-npu=y
 CONFIG_PACKAGE_luci-app-firewall=y
+CONFIG_PACKAGE_luci-app-irqbalance=y
 CONFIG_PACKAGE_luci-app-log-viewer=y
+CONFIG_PACKAGE_luci-app-mlo=y
+CONFIG_PACKAGE_luci-app-sqm=y
 CONFIG_PACKAGE_luci-app-watchcat=y
 CONFIG_PACKAGE_luci-app-w1700k-fancontrol=y
+CONFIG_PACKAGE_luci-app-wifi7=y
 CONFIG_PACKAGE_luci-proto-ipv6=y
 CONFIG_PACKAGE_luci-proto-ppp=y
+CONFIG_PACKAGE_luci-proto-wireguard=y
 CONFIG_PACKAGE_luci-ssl-openssl=y
 CONFIG_PACKAGE_nano=y
 CONFIG_PACKAGE_openssh-sftp-server=y
+CONFIG_PACKAGE_openssl-util=y
+CONFIG_PACKAGE_sqm-scripts=y
+CONFIG_PACKAGE_tc-full=y
+CONFIG_PACKAGE_tcpdump=y
 CONFIG_PACKAGE_watchcat=y
+CONFIG_PACKAGE_wireguard-tools=y
+CONFIG_PACKAGE_w1700k-hw21-bouygues-support=y
 # CONFIG_PACKAGE_wpad-basic-mbedtls is not set
+# CONFIG_PACKAGE_wpad-basic-openssl is not set
+# CONFIG_PACKAGE_wpad-mbedtls is not set
 CONFIG_PACKAGE_wpad-openssl=y
 # CONFIG_PACKAGE_dnsmasq is not set
+# CONFIG_PACKAGE_luci-ssl is not set
 # CONFIG_SIGN_EACH_PACKAGE is not set
 # CONFIG_TARGET_ROOTFS_INITRAMFS is not set

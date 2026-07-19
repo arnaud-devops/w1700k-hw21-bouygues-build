@@ -17,7 +17,7 @@ jobs:
       DK_USER: /bld/user
       DK_PROFILE: /bld/user/current
       GH_TOKEN: ${{ github.token }}
-      CACHE_EPOCH: native-abi-v2
+      CACHE_EPOCH: gilly19-hw21-v2
       BUILDER_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:cd751ad00ac9b994b503947f8cb9056ad9a3b15652b629784852b21e0fe66fd5
       CACHE_SEED_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:1c116f8db4cde4efd79b0c0123de0eb013f1ad51092f7b711568c812187fc9c4
     steps:
@@ -87,8 +87,8 @@ jobs:
           git clean -fdx
           git fetch --prune origin "$REPO_BRANCH"
           if [[ $REPO_COMMIT ]]; then
-            # Fanboy periodically rebases ubi2. Fetch the immutable object as
-            # well so a pinned build does not depend on branch reachability.
+            # Fetch the immutable object explicitly so branch movement cannot
+            # determine a supposedly pinned build.
             git fetch --no-tags origin "$REPO_COMMIT"
             git checkout --detach "$REPO_COMMIT"
             [[ "$(git rev-parse HEAD)" == "$REPO_COMMIT" ]] || {
@@ -106,6 +106,12 @@ jobs:
             echo "OpenWrt repository: $REPO_URL"
             echo "OpenWrt branch: $REPO_BRANCH"
             echo "OpenWrt commit: $(git rev-parse HEAD)"
+            echo "Gilly patch repository: $GILLY_REPO_URL"
+            echo "Gilly patch commit: $GILLY_REPO_COMMIT"
+            echo "Fanboy application repository: $FANBOY_APPS_REPO_URL"
+            echo "Fanboy application commit: $FANBOY_APPS_REPO_COMMIT"
+            echo "Log viewer repository: $LOG_VIEWER_REPO_URL"
+            echo "Log viewer commit: $LOG_VIEWER_REPO_COMMIT"
             echo
             git show -s --format="%H%n%ci%n%s" HEAD
           } > files/build_info
@@ -171,12 +177,16 @@ jobs:
             } | tee -a files/build_info $DK_BIN/build_info >/dev/null
             rm -f "$profile_patch_actual"
           fi
-          hostapd_hash=8b17bbe5c77c59a876d0b0ae037679c696713deab6de4a1d05e000a4d593153a
-          if ! grep -qx "PKG_MIRROR_HASH:=$hostapd_hash" \
-            package/network/services/hostapd/Makefile; then
-            echo "::error::The hostapd source archive is not locked to the audited SHA-256"
+          grep -qx "PKG_SOURCE_VERSION:=b004de0bf1b54d669d358b7f33d6f474bd9719a6" \
+            package/network/services/hostapd/Makefile || {
+            echo "::error::Unexpected hostapd source revision"
             exit 1
-          fi
+          }
+          grep -qx "PKG_MIRROR_HASH:=0b0184e600c994a1f0415f52e8af26b39f13e376a30cdf0b4f3ca1a206e52fc8" \
+            package/network/services/hostapd/Makefile || {
+            echo "::error::Unexpected hostapd source archive hash"
+            exit 1
+          }
           if [ -d "$bp/files" ]; then
             profile_lock=$bp/profile-files.sha256
             [ -f "$profile_lock" ] || {
@@ -256,9 +266,26 @@ jobs:
             exit 1
           fi
           cp -a --no-preserve=ownership,xattr "$bp/source-files/." .
-          selective_patch=target/linux/airoha/patches-6.18/965-net-airoha-disable-hw-offload-for-ipv6-vlan-uplink-only.patch
-          [ -f "$selective_patch" ] || {
-            echo "::error::Selective IPv6/VLAN offload patch is missing"
+          root_fix=target/linux/airoha/patches-6.18/971-net-airoha-sync-UPDMEM-source-MAC-for-offloaded-IPv6.patch
+          [ -s "$root_fix" ] || {
+            echo "::error::Root-cause IPv6 UPDMEM patch 971 is missing"
+            exit 1
+          }
+          if find target/linux -type f -name "*965*ipv6*vlan*" | grep -q .; then
+            echo "::error::Selective fallback patch 965 must not be applied"
+            exit 1
+          fi
+          [ -s package/kernel/mt76/patches/020-wifi-mt76-mt7996-report-radar-on-detecting-chanctx.patch ] || {
+            echo "::error::The mt7996 radar attribution fix is missing"
+            exit 1
+          }
+          grep -Fq "rtl8261ce_match_phy_device" \
+            target/linux/generic/files/drivers/net/phy/rtl8261ce/rtk_rtl8261ce_phy.c || {
+            echo "::error::The strict RTL8261CE matcher is missing"
+            exit 1
+          }
+          grep -Fq "ramoops@86ff0000" target/linux/airoha/dts/an7581.dtsi || {
+            echo "::error::The 64 KiB ramoops reservation is missing"
             exit 1
           }
           {
@@ -272,19 +299,33 @@ jobs:
           fi
           make defconfig
           for option in \
-            CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi=y \
+            CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi2=y \
             CONFIG_JSON_OVERVIEW_IMAGE_INFO=y \
             CONFIG_JSON_CYCLONEDX_SBOM=y \
             CONFIG_PACKAGE_apk-openssl=y \
+            CONFIG_PACKAGE_curl=y \
             CONFIG_PACKAGE_dnsmasq-full=y \
             CONFIG_PACKAGE_dnsproxy=y \
             CONFIG_PACKAGE_ethtool-full=y \
+            CONFIG_PACKAGE_ip-full=y \
+            CONFIG_PACKAGE_irqbalance=y \
+            CONFIG_PACKAGE_kmod-ifb=y \
+            CONFIG_PACKAGE_kmod-sched-cake=y \
             CONFIG_PACKAGE_libustream-openssl=y \
+            CONFIG_PACKAGE_luci-app-airoha-flowsense=y \
+            CONFIG_PACKAGE_luci-app-airoha-npu=y \
+            CONFIG_PACKAGE_luci-app-irqbalance=y \
             CONFIG_PACKAGE_luci-app-log-viewer=y \
+            CONFIG_PACKAGE_luci-app-mlo=y \
+            CONFIG_PACKAGE_luci-app-sqm=y \
             CONFIG_PACKAGE_luci-app-watchcat=y \
+            CONFIG_PACKAGE_luci-app-wifi7=y \
             CONFIG_PACKAGE_luci-ssl-openssl=y \
             CONFIG_PACKAGE_openssh-sftp-server=y \
+            CONFIG_PACKAGE_sqm-scripts=y \
+            CONFIG_PACKAGE_tc-full=y \
             CONFIG_PACKAGE_watchcat=y \
+            CONFIG_PACKAGE_w1700k-hw21-bouygues-support=y \
             CONFIG_PACKAGE_wpad-openssl=y; do
             grep -qx "$option" .config || {
               echo "::error::Required build option is missing: $option"
@@ -299,25 +340,23 @@ jobs:
             echo "::error::The full wpad package would conflict with wpad-basic-mbedtls"
             exit 1
           }
+          grep -qx "# CONFIG_PACKAGE_wpad-mbedtls is not set" .config || {
+            echo "::error::The full OpenSSL wpad package would conflict with wpad-mbedtls"
+            exit 1
+          }
           forbidden_found=0
           for forbidden_option in \
             CONFIG_ALL_KMODS \
             CONFIG_PACKAGE_apk-mbedtls \
             CONFIG_PACKAGE_attendedsysupgrade-common \
             CONFIG_PACKAGE_ca-certificates \
-            CONFIG_PACKAGE_curl \
             CONFIG_PACKAGE_fastfetch \
-            CONFIG_PACKAGE_irqbalance \
             CONFIG_PACKAGE_librespeed-go \
             CONFIG_PACKAGE_libustream-mbedtls \
-            CONFIG_PACKAGE_luci-app-airoha-npu \
             CONFIG_PACKAGE_luci-app-attendedsysupgrade \
             CONFIG_PACKAGE_luci-app-filemanager \
-            CONFIG_PACKAGE_luci-app-irqbalance \
-            CONFIG_PACKAGE_luci-app-mlo \
             CONFIG_PACKAGE_luci-app-netspeedtest \
             CONFIG_PACKAGE_luci-app-ttyd \
-            CONFIG_PACKAGE_luci-app-wifi7 \
             CONFIG_PACKAGE_luci-proto-relay \
             CONFIG_PACKAGE_owut \
             CONFIG_PACKAGE_relayd \
@@ -344,15 +383,15 @@ jobs:
             fi
           fi
           rm -f "$download_log"
-          hostapd_archive=dl/hostapd-2026.07.09~f08f2749.tar.zst
+          hostapd_archive=dl/hostapd-2026.04.02~b004de0b.tar.zst
           [ -f "$hostapd_archive" ] || {
             echo "::error::The pinned hostapd source archive was not produced"
             exit 1
           }
           actual_hostapd_hash=$(sha256sum "$hostapd_archive")
           actual_hostapd_hash=${actual_hostapd_hash%% *}
-          if [ "$actual_hostapd_hash" != "$hostapd_hash" ]; then
-            echo "::error::Hostapd archive hash is $actual_hostapd_hash, expected $hostapd_hash"
+          if [ "$actual_hostapd_hash" != "0b0184e600c994a1f0415f52e8af26b39f13e376a30cdf0b4f3ca1a206e52fc8" ]; then
+            echo "::error::Unexpected hostapd archive hash: $actual_hostapd_hash"
             exit 1
           fi
         '
@@ -459,11 +498,15 @@ jobs:
           for rel in \
             etc/apk/repositories.d/distfeeds.list \
             etc/hotplug.d/iface/95-dnsproxy-restore \
+            etc/hotplug.d/net/50-flow-offload-wifi \
             etc/hotplug.d/net/50-nf-bridge-call \
             etc/init.d/dnsproxy-restore \
-            etc/uci-defaults/15-w1700k-flow-offload \
-            etc/uci-defaults/99-w1700k-hw21-bouygues \
-            usr/local/sbin/restore-dnsproxy-after-sysupgrade; do
+            etc/init.d/w1700k-pstore \
+            etc/uci-defaults/99-w1700k-hw21-bouygues-v2 \
+            usr/local/sbin/restore-dnsproxy-after-sysupgrade \
+            usr/local/sbin/w1700k-healthcheck \
+            usr/local/sbin/w1700k-pstore-collect \
+            usr/local/sbin/w1700k-watchcat-recover; do
             if [ -f "$DK_PROFILE/files/$rel" ]; then
               cmp "$DK_PROFILE/files/$rel" "$root/$rel" || {
                 echo "::error::Assembled rootfs file differs from the locked profile: $rel"
@@ -478,15 +521,31 @@ jobs:
           for rel in \
             etc/hotplug.d/iface/95-dnsproxy-restore \
             etc/init.d/dnsproxy-restore \
+            etc/init.d/fan \
+            etc/init.d/irqbalance \
+            etc/init.d/npu-jitter \
             etc/init.d/watchcat \
-            etc/uci-defaults/99-w1700k-hw21-bouygues \
+            etc/init.d/w1700k-pstore \
+            etc/uci-defaults/99-w1700k-hw21-bouygues-v2 \
             usr/local/sbin/restore-dnsproxy-after-sysupgrade \
+            usr/local/sbin/w1700k-healthcheck \
+            usr/local/sbin/w1700k-pstore-collect \
+            usr/local/sbin/w1700k-watchcat-recover \
             usr/bin/watchcat.sh \
+            usr/bin/curl \
             usr/bin/flock \
+            usr/bin/iperf3 \
+            usr/bin/jq \
             usr/libexec/sftp-server \
+            usr/libexec/npu-jitter-daemon \
+            usr/libexec/rpcd/luci.airoha_flowsense \
+            usr/libexec/rpcd/luci.fan \
             usr/sbin/ethtool \
+            usr/sbin/irqbalance \
             usr/sbin/nft \
             usr/sbin/odhcp6c \
+            usr/sbin/tc \
+            usr/sbin/tcpdump \
             usr/sbin/wpad; do
             [ -x "$root/$rel" ] || {
               echo "::error::Required executable is missing from the rootfs: $rel"
@@ -495,10 +554,8 @@ jobs:
           done
 
           for rel in \
-            etc/init.d/irqbalance \
             etc/init.d/ttyd \
             etc/vermagic.txt \
-            usr/bin/curl \
             usr/bin/fastfetch \
             usr/bin/ttyd \
             www/cgi-bin/github_check \
@@ -512,8 +569,14 @@ jobs:
             }
           done
           for rel in \
+            usr/share/luci/menu.d/luci-app-airoha-flowsense.json \
+            usr/share/luci/menu.d/luci-app-airoha-npu.json \
+            usr/share/luci/menu.d/luci-app-irqbalance.json \
             usr/share/luci/menu.d/luci-app-log-viewer.json \
+            usr/share/luci/menu.d/luci-app-mlo.json \
+            usr/share/luci/menu.d/luci-app-sqm.json \
             usr/share/luci/menu.d/luci-app-watchcat.json \
+            usr/share/luci/menu.d/luci-app-wifi7.json \
             usr/share/rpcd/ucode/luci.log-viewer \
             www/luci-static/resources/view/watchcat.js; do
             [ -s "$root/$rel" ] || {
@@ -532,7 +595,7 @@ jobs:
             exit 1
           }
           grep -Fq "flock 9" \
-            "$root/etc/uci-defaults/15-w1700k-flow-offload" || {
+            "$root/etc/hotplug.d/net/50-flow-offload-wifi" || {
             echo "::error::The serialized Wi-Fi flowtable hook is missing"
             exit 1
           }
@@ -579,13 +642,49 @@ jobs:
             }
           done
 
-          for module in airoha_npu.ko airoha-eth.ko mt7996e.ko rtk-rtl8261ce-phy.ko; do
+          # Gilly 19.07 builds the Airoha Ethernet/NPU and RTL8261CE drivers
+          # into the kernel; only mt7996e remains a loadable module.
+          for module in mt7996e.ko; do
             count=$(find "$root/lib/modules" -type f -name "$module" | wc -l)
             [ "$count" -eq 1 ] || {
               echo "::error::Expected one $module in the rootfs, found $count"
               exit 1
             }
           done
+          mapfile -t kernel_configs < <(find build_dir -type f -path "*/linux-6.18.38/.config" -print)
+          [ "${#kernel_configs[@]}" -eq 1 ] || {
+            echo "::error::Expected one final Linux config, found ${#kernel_configs[@]}"
+            exit 1
+          }
+          for option in \
+            CONFIG_NET_AIROHA=y \
+            CONFIG_NET_AIROHA_NPU=y \
+            CONFIG_RTL8261CE_PHY=y \
+            CONFIG_PSTORE=y \
+            CONFIG_PSTORE_RAM=y; do
+            grep -qx "$option" "${kernel_configs[0]}" || {
+              echo "::error::Final kernel option is missing: $option"
+              exit 1
+            }
+          done
+          mapfile -t dtbs < <(find build_dir -type f -name "an7581-w1700k-ubi.dtb" -print)
+          [ "${#dtbs[@]}" -eq 1 ] || {
+            echo "::error::Expected one W1700K DTB, found ${#dtbs[@]}"
+            exit 1
+          }
+          fdtget=staging_dir/host/bin/fdtget
+          [ -x "$fdtget" ] || {
+            echo "::error::Host fdtget is unavailable"
+            exit 1
+          }
+          "$fdtget" -l "${dtbs[0]}" /reserved-memory | grep -qx "ramoops@86ff0000" || {
+            echo "::error::The final DTB has no ramoops node"
+            exit 1
+          }
+          [ "$("$fdtget" -tx "${dtbs[0]}" /reserved-memory/ramoops@86ff0000 reg)" = "0 86ff0000 0 10000" ] || {
+            echo "::error::The final DTB ramoops reservation is not 64 KiB at 0x86ff0000"
+            exit 1
+          }
           [ "$(readlink "$root/usr/sbin/hostapd")" = wpad ]
           [ "$(readlink "$root/usr/sbin/wpa_supplicant")" = wpad ]
           cmp "$DK_BIN/build_info" "$root/build_info" || {
@@ -654,34 +753,46 @@ jobs:
               apk-openssl \
               arp-scan \
               ca-bundle \
+              curl \
               dnsmasq-full \
               dnsproxy \
               ethtool-full \
               firewall4 \
               fping \
               hostapd-common \
+              ip-bridge \
+              ip-full \
               iperf3 \
+              irqbalance \
               iw \
-              kmod-airoha-eth \
-              kmod-airoha-npu \
+              jq \
               kmod-br-netfilter \
               kmod-crypto-hw-eip93 \
-              kmod-dsa-mt7530-mmio \
+              kmod-ifb \
               kmod-mt7996-firmware \
               kmod-mt7996-firmware-common \
               kmod-mt7996e \
               kmod-nf-flow \
               kmod-nft-offload \
               kmod-phy-realtek \
-              kmod-phy-rtl8261ce \
+              kmod-sched-cake \
+              kmod-sched-core \
+              kmod-wireguard \
+              libcurl4 \
               libopenssl-legacy \
               luci-app-airoha-flowsense \
+              luci-app-airoha-npu \
               luci-app-firewall \
+              luci-app-irqbalance \
               luci-app-log-viewer \
+              luci-app-mlo \
               luci-app-package-manager \
+              luci-app-sqm \
               luci-app-watchcat \
               luci-app-w1700k-fancontrol \
+              luci-app-wifi7 \
               luci-proto-ipv6 \
+              luci-proto-wireguard \
               luci-ssl-openssl \
               nano \
               nftables-json \
@@ -690,8 +801,13 @@ jobs:
               openssl-util \
               openssh-sftp-server \
               rtl826x-firmware \
+              sqm-scripts \
+              tc-full \
+              tcpdump \
               watchcat \
               wifi-scripts \
+              wireguard-tools \
+              w1700k-hw21-bouygues-support \
               wpad-openssl; do
             grep -q "^$package - " "$manifest" || {
               echo "::error::Required package is absent from $manifest: $package"
@@ -705,24 +821,21 @@ jobs:
           for package in \
             apk-mbedtls \
             attendedsysupgrade-common \
+            bridger \
             ca-certificates \
-            curl \
             dnsmasq \
             fastfetch \
-            irqbalance \
-            libcurl4 \
+            libmbedtls21 \
             librespeed-go \
             libustream-mbedtls \
-            luci-app-airoha-npu \
             luci-app-attendedsysupgrade \
             luci-app-filemanager \
-            luci-app-irqbalance \
-            luci-app-mlo \
             luci-app-netspeedtest \
             luci-app-ttyd \
-            luci-app-wifi7 \
+            luci-ssl \
             luci-proto-relay \
             owut \
+            px5g-mbedtls \
             relayd \
             ttyd; do
             if grep -q "^$package - " "$manifest"; then
@@ -743,15 +856,15 @@ jobs:
             echo "::error::Unexpected arp-scan version in $manifest"
             exit 1
           }
-          grep -q '^wifi-scripts - 1\.0-r2$' "$manifest" || {
+          grep -q '^wifi-scripts - 1\.0-r1$' "$manifest" || {
             echo "::error::Unexpected wifi-scripts version in $manifest"
             exit 1
           }
-          grep -q '^hostapd-common - .*~f08f2749' "$manifest" || {
+          grep -q '^hostapd-common - .*~b004de0b' "$manifest" || {
             echo "::error::Unexpected hostapd version in $manifest"
             exit 1
           }
-          grep -q '^wpad-openssl - .*~f08f2749' "$manifest" || {
+          grep -q '^wpad-openssl - .*~b004de0b' "$manifest" || {
             echo "::error::Unexpected wpad version in $manifest"
             exit 1
           }
@@ -761,6 +874,14 @@ jobs:
           }
           grep -q '^luci-app-log-viewer - 1\.5\.0-r2$' "$manifest" || {
             echo "::error::Unexpected log viewer version in $manifest"
+            exit 1
+          }
+          grep -q '^irqbalance - 1\.9\.5-r1$' "$manifest" || {
+            echo "::error::Unexpected irqbalance version in $manifest"
+            exit 1
+          }
+          grep -q '^w1700k-hw21-bouygues-support - 2\.0\.0-r1$' "$manifest" || {
+            echo "::error::Unexpected profile support package version in $manifest"
             exit 1
           }
         done

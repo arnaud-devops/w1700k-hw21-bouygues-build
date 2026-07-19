@@ -1,4 +1,6 @@
-# Feed commits captured and reviewed on 2026-07-14.
-packages a01cb8a3f9d8a532029555609d309d8329beac07
-luci 5cf20c5741dc34eea0faaf7324ef3751b05fa1f3
+# Feed commits at the Gilly 19.07 build window, all immutable.
+packages b9f1de40dc1f716b94e40383458e192c040619bc
+luci 25b3d5b9908687dceabe7804b4003ce345323ced
 routing c7872431105f69894201dc522b7560e47d1e8ba9
+telephony 5d68d53c160a325ea9d03fce393e051573bcc736
+video a951381b6c58b9b1eb087f09c9a20cff4ffe8063
