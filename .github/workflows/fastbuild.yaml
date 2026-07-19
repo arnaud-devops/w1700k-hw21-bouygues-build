@@ -338,6 +338,7 @@ jobs:
             CONFIG_PACKAGE_dnsmasq-full=y \
             CONFIG_PACKAGE_dnsproxy=y \
             CONFIG_PACKAGE_ethtool-full=y \
+            CONFIG_PACKAGE_flock=y \
             CONFIG_PACKAGE_ip-full=y \
             CONFIG_PACKAGE_irqbalance=y \
             CONFIG_PACKAGE_kmod-ifb=y \

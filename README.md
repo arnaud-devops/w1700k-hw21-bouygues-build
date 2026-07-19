@@ -40,7 +40,7 @@ All five OpenWrt feeds are pinned in
 [`feeds.lock`](user/ubi2-hw21-bouygues/feeds.lock). The source overlay,
 profile files and build hook have independent SHA-256 locks.
 
-Detailed provenance and the two intentional local source changes are recorded
+Detailed provenance and the four intentional local source changes are recorded
 in [`UPSTREAM-SOURCES.md`](user/ubi2-hw21-bouygues/UPSTREAM-SOURCES.md).
 
 ## Network and PPE policy
@@ -93,7 +93,7 @@ after compilation.
 - `irqbalance` and its LuCI panel
 - SQM/Cake and its LuCI panel, installed but disabled
 - log viewer, fan control and OpenSSH SFTP
-- `curl`, `jq`, `ip-full`, `ip-bridge`, `tc-full`, `tcpdump`, `iperf3`,
+- `curl`, `jq`, `flock`, `ip-full`, `ip-bridge`, `tc-full`, `tcpdump`, `iperf3`,
   `ethtool-full`, `arp-scan`, `fping`, WireGuard and focused diagnostics
 
 Attended Sysupgrade, `owut`, `bridger`, `ttyd`, the LuCI file manager and the
