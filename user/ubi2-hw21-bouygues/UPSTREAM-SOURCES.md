@@ -61,8 +61,11 @@ additional package directories; they do not edit the Gilly driver patches.
 - rootfs-only profile files: `profile-files.sha256`
 - build hook: `profile-hooks.sha256`
 - OpenWrt feeds: `feeds.lock`
+- builder container: mirrored into this repository's GHCR namespace from the
+  pinned upstream digest, then pulled and verified by digest before use
 - upstream and builder commits: embedded in `/build_info`
 
 The workflow compares these locks before `make defconfig`, rejects missing
 `971` or present `965`, and checks the final kernel config and DTB after the
-build.
+build. The cache seed is a best-effort performance optimization and is not a
+source of files included in the firmware.
