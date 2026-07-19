@@ -610,7 +610,7 @@ jobs:
             usr/sbin/irqbalance \
             usr/sbin/nft \
             usr/sbin/odhcp6c \
-            usr/sbin/tcpdump \
+            usr/bin/tcpdump \
             usr/sbin/wpad; do
             [ -x "$root/$rel" ] || {
               echo "::error::Required executable is missing from the rootfs: $rel"
