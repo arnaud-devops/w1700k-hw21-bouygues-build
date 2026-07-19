@@ -319,10 +319,10 @@ jobs:
           }
           make defconfig
           echo "Resolved OpenWrt target selection:"
-          grep '^CONFIG_TARGET' .config || true
+          grep "^CONFIG_TARGET" .config || true
           if ! grep -qx "CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi2=y" .config; then
             echo "Generated device symbols containing W1700K:"
-            grep -i 'w1700k' tmp/.config-target.in tmp/.targetinfo .config 2>/dev/null || true
+            grep -i "w1700k" tmp/.config-target.in tmp/.targetinfo .config 2>/dev/null || true
           fi
           for option in \
             CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi2=y \
