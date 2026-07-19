@@ -723,24 +723,27 @@ jobs:
             }
           done
           mapfile -t kernel_configs < <(find build_dir -type f -path "*/linux-6.18.38/.config" -print)
-          [ "${#kernel_configs[@]}" -eq 1 ] || {
-            echo "::error::Expected one final Linux config, found ${#kernel_configs[@]}"
+          [ "${#kernel_configs[@]}" -ge 1 ] || {
+            echo "::error::No final Linux config was found"
             exit 1
           }
-          for option in \
-            CONFIG_NET_AIROHA=y \
-            CONFIG_NET_AIROHA_NPU=y \
-            CONFIG_RTL8261CE_PHY=y \
-            CONFIG_PSTORE=y \
-            CONFIG_PSTORE_RAM=y; do
-            grep -qx "$option" "${kernel_configs[0]}" || {
-              echo "::error::Final kernel option is missing: $option"
-              exit 1
-            }
+          printf "Validating Linux configs:\n%s\n" "${kernel_configs[*]}"
+          for kernel_config in "${kernel_configs[@]}"; do
+            for option in \
+              CONFIG_NET_AIROHA=y \
+              CONFIG_NET_AIROHA_NPU=y \
+              CONFIG_RTL8261CE_PHY=y \
+              CONFIG_PSTORE=y \
+              CONFIG_PSTORE_RAM=y; do
+              grep -qx "$option" "$kernel_config" || {
+                echo "::error::Final kernel option is missing from $kernel_config: $option"
+                exit 1
+              }
+            done
           done
           mapfile -t dtbs < <(find build_dir -type f -name "an7581-w1700k-ubi.dtb" -print)
-          [ "${#dtbs[@]}" -eq 1 ] || {
-            echo "::error::Expected one W1700K DTB, found ${#dtbs[@]}"
+          [ "${#dtbs[@]}" -ge 1 ] || {
+            echo "::error::No W1700K DTB was found"
             exit 1
           }
           fdtget=staging_dir/host/bin/fdtget
@@ -748,14 +751,17 @@ jobs:
             echo "::error::Host fdtget is unavailable"
             exit 1
           }
-          "$fdtget" -l "${dtbs[0]}" /reserved-memory | grep -qx "ramoops@86ff0000" || {
-            echo "::error::The final DTB has no ramoops node"
-            exit 1
-          }
-          [ "$("$fdtget" -tx "${dtbs[0]}" /reserved-memory/ramoops@86ff0000 reg)" = "0 86ff0000 0 10000" ] || {
-            echo "::error::The final DTB ramoops reservation is not 64 KiB at 0x86ff0000"
-            exit 1
-          }
+          printf "Validating W1700K DTBs:\n%s\n" "${dtbs[*]}"
+          for dtb in "${dtbs[@]}"; do
+            "$fdtget" -l "$dtb" /reserved-memory | grep -qx "ramoops@86ff0000" || {
+              echo "::error::The W1700K DTB has no ramoops node: $dtb"
+              exit 1
+            }
+            [ "$("$fdtget" -tx "$dtb" /reserved-memory/ramoops@86ff0000 reg)" = "0 86ff0000 0 10000" ] || {
+              echo "::error::The W1700K DTB ramoops reservation is not 64 KiB at 0x86ff0000: $dtb"
+              exit 1
+            }
+          done
           [ "$(readlink "$root/usr/sbin/hostapd")" = wpad ]
           [ "$(readlink "$root/usr/sbin/wpa_supplicant")" = wpad ]
           cmp "$DK_BIN/build_info" "$root/build_info" || {
