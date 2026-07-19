@@ -312,6 +312,11 @@ jobs:
           if [ -f "$bp/custom.sh" ]; then
             bash "$bp/custom.sh"
           fi
+          # feeds install may have generated target/package metadata before the
+          # Gilly overlay replaced an7581.mk and added local packages. cp -a
+          # preserves older mtimes, so make can otherwise reuse stale UBI/EVB
+          # metadata and silently ignore the UBI2 profile.
+          rm -rf tmp
           grep -Fqx "TARGET_DEVICES += gemtek_w1700k-ubi2" \
             target/linux/airoha/image/an7581.mk || {
             echo "::error::The Gilly UBI2 image profile is missing"
