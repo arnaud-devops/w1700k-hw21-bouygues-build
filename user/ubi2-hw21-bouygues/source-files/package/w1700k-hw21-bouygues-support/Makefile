@@ -13,7 +13,7 @@ define Package/w1700k-hw21-bouygues-support
   SECTION:=net
   CATEGORY:=Network
   TITLE:=W1700K HW2.1 Bouygues recovery and diagnostics
-  DEPENDS:=+dnsmasq-full +dnsproxy +flock +irqbalance +jsonfilter +watchcat +wpad-openssl
+  DEPENDS:=+dnsmasq-full +dnsproxy +irqbalance +jsonfilter +watchcat +wpad-openssl
 endef
 
 define Package/w1700k-hw21-bouygues-support/description

@@ -364,6 +364,7 @@ jobs:
           fi
           for option in \
             CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi2=y \
+            CONFIG_BUSYBOX_CONFIG_FLOCK=y \
             CONFIG_JSON_OVERVIEW_IMAGE_INFO=y \
             CONFIG_JSON_CYCLONEDX_SBOM=y \
             CONFIG_PACKAGE_apk-openssl=y \
@@ -371,7 +372,6 @@ jobs:
             CONFIG_PACKAGE_dnsmasq-full=y \
             CONFIG_PACKAGE_dnsproxy=y \
             CONFIG_PACKAGE_ethtool-full=y \
-            CONFIG_PACKAGE_flock=y \
             CONFIG_PACKAGE_ip-full=y \
             CONFIG_PACKAGE_irqbalance=y \
             CONFIG_PACKAGE_kmod-ifb=y \

@@ -88,7 +88,7 @@ e1407bd00aebad2746d5be4b62e341431d16ee0803635fc1fabeacbb6cecd4fa  ./package/netw
 af57fbda1daef4b4b3d73d50393ec0f8b2d79043a9d74e371988668006f2017f  ./package/network/services/hostapd/patches/602-nl80211-short-circuit-use-existing-iface.patch
 0ccb3b9699b238cfccead58ea45a9298f03bc0b2d24c285be227da1af31f79f7  ./package/network/utils/iwinfo/patches/700-nl80211-freqlist-per-radio.patch
 5270f39bc71ad2c1c8cabc5670a4890d352ab9b6d24ecb4afa845ee587fb6e20  ./package/network/utils/iwinfo/patches/999-fix-txpower-list.patch
-5fafa578e7f33a95ec8bc837ce47960804e026ac64581e7b11f4025c36047234  ./package/w1700k-hw21-bouygues-support/Makefile
+5ef8748389c1f8bde40f27c6b80cf23e3ba0802121407f47b79928328ffec948  ./package/w1700k-hw21-bouygues-support/Makefile
 2687c4d55cb2a475a82f3731d2a4bd25c61c90b5ecd30bee8874acd42423fda2  ./package/w1700k-hw21-bouygues-support/files/etc/hotplug.d/iface/95-dnsproxy-restore
 55de9ac6b65f0810c30dfd9cfae5920a72f181d574b132dcb211dda07a3e4cd0  ./package/w1700k-hw21-bouygues-support/files/etc/hotplug.d/net/50-flow-offload-wifi
 8ab6bf79d9ca5681ce71db6ddd6db11cf33a55cf080bb703f1b0ad85f9c1ea39  ./package/w1700k-hw21-bouygues-support/files/etc/hotplug.d/net/50-nf-bridge-call

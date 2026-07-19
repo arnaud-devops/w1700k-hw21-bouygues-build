@@ -93,8 +93,9 @@ after compilation.
 - `irqbalance` and its LuCI panel
 - SQM/Cake and its LuCI panel, installed but disabled
 - log viewer, fan control and OpenSSH SFTP
-- `curl`, `jq`, `flock`, `ip-full`, `ip-bridge`, `tc-full`, `tcpdump`, `iperf3`,
-  `ethtool-full`, `arp-scan`, `fping`, WireGuard and focused diagnostics
+- `curl`, `jq`, BusyBox `flock`, `ip-full`, `ip-bridge`, `tc-full`, `tcpdump`,
+  `iperf3`, `ethtool-full`, `arp-scan`, `fping`, WireGuard and focused
+  diagnostics
 
 Attended Sysupgrade, `owut`, `bridger`, `ttyd`, the LuCI file manager and the
 router-hosted speed-test server are excluded.
