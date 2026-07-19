@@ -16,7 +16,7 @@ d263dd8e1027e1d47c83f8283d9309bd9027ecd707a892b139009bac4fcec1d4  ./package/kern
 64d6f6fd157c691dd6f528dd2c7159b3fca4cad0999f8d808e94b839c2755aea  ./package/kernel/mt76/patches/018-wifi-mt76-mt7996-fix-NULL-deref-in-bfer_eht.patch
 6e0a5f23cb605f44d3fdb36d237b4fd8214ca6b3178a227734499e4989948a5a  ./package/kernel/mt76/patches/019-wifi-mt76-mt7996-guard-tx-free-overrun.patch
 4de1fd65f855f39bc6535758a75296285aec11c36a4ff28bc41b0bda04f9924f  ./package/kernel/mt76/patches/020-wifi-mt76-mt7996-report-radar-on-detecting-chanctx.patch
-991a4f26fcfcf77088a5b2291d2d4277a9cd682c0633f5242d41d405eabc2b8a  ./package/luci-app-airoha-flowsense/Makefile
+e4e7a90247e134a457407b9176dd2b086fa542b2ffd97e4ad23391cd10f39170  ./package/luci-app-airoha-flowsense/Makefile
 f1bf1527c2098eb5a4f8c0cb749d5e6bd8dbcd10e29ccca4e24b537e2f90e343  ./package/luci-app-airoha-flowsense/htdocs/luci-static/resources/view/airoha_flowsense/status.js
 d1690fb33540f5a43935bd167eeb75b8eb57607d5b236473965cca4771d10da5  ./package/luci-app-airoha-flowsense/root/etc/config/npu-monitor
 1785325469113b24ee52543d28aa538aab5952f7657b6151d0489b61bf41dabc  ./package/luci-app-airoha-flowsense/root/etc/init.d/npu-jitter
@@ -57,7 +57,7 @@ a9af7fec2c10fb7e8337dd6550f7e23ff9e8186732d127654158313eaa66942a  ./package/luci
 3b0a1612b854aa11dcbf77945b443b40eabaf955cb13f9a0ed6dbe2ed0c03a80  ./package/luci-app-mlo/root/usr/share/luci/menu.d/luci-app-mlo.json
 4b09129cd3063c4c78c2c99599882453ca081af75edda7c7e2d620cb914ffdeb  ./package/luci-app-mlo/root/usr/share/rpcd/acl.d/luci-app-mlo.json
 7f0f022815d9ffe57a2b9a717d49893f77bfed052f16af179dcb99dbbb6f6ab8  ./package/luci-app-w1700k-fancontrol/LICENSE
-b97eea5695d7df19ee1785e164329cac7b84b8067467b57b7bdcc22d10e2b3c1  ./package/luci-app-w1700k-fancontrol/Makefile
+22a69812d35771637e55679b85eb976189848b2d068bc616e687168ac94c5233  ./package/luci-app-w1700k-fancontrol/Makefile
 7de2060d199ba0ada3a39fbe307778afaef225326a549ce6d328ddd51ed5f3fe  ./package/luci-app-w1700k-fancontrol/README.md
 e50e7601c8935fce7d8ad882a651f14b5512d7038cc5b68b229d609489703d9f  ./package/luci-app-w1700k-fancontrol/htdocs/luci-static/resources/view/fan/settings.js
 32f274b4b9d3ed23d8ab504194c13b6956c9c73726ed2ba91697bbad92259e17  ./package/luci-app-w1700k-fancontrol/htdocs/luci-static/resources/view/fan/status.js

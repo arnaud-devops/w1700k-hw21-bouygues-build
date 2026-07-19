@@ -32,7 +32,7 @@ the builder. PR 24038 and the `bridger` package are not imported.
 
 ## Intentional local source changes
 
-Only two Gilly-provided source files differ by content:
+Four Gilly-provided source files differ by content:
 
 1. `target/linux/airoha/dts/an7581.dtsi`
 
@@ -42,6 +42,15 @@ Only two Gilly-provided source files differ by content:
 2. `target/linux/airoha/an7581/config-6.18`
 
    Enables `PSTORE`, RAM backend, console and pmsg capture for that node.
+
+3. `package/luci-app-airoha-flowsense/Makefile`
+
+4. `package/luci-app-w1700k-fancontrol/Makefile`
+
+   These two applications retain Gilly's content. Their `luci.mk` include is
+   changed to `$(TOPDIR)/feeds/luci/luci.mk` because this builder installs
+   custom applications under `package/`, while Gilly's helper places them in
+   `feeds/luci/applications/`.
 
 The custom LuCI applications and `w1700k-hw21-bouygues-support` package are
 additional package directories; they do not edit the Gilly driver patches.
