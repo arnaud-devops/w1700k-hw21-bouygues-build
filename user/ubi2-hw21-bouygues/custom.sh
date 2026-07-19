@@ -7,6 +7,12 @@ set -euo pipefail
 rm -f \
 	files/998-single-wiphy.patch \
 	files/overview.js \
+	files/etc/fe_debug_reg.sh \
+	files/etc/fe_reg.sh \
+	files/etc/gsw_status.sh \
+	files/etc/md.sh \
+	files/etc/testgpio.sh \
+	files/etc/xsi_mac_dbg.sh \
 	files/www/cgi-bin/github_check \
 	files/www/cgi-bin/github_fetch
 
