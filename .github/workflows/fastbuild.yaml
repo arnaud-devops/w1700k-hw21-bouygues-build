@@ -605,11 +605,11 @@ jobs:
             usr/libexec/npu-jitter-daemon \
             usr/libexec/rpcd/luci.airoha_flowsense \
             usr/libexec/rpcd/luci.fan \
+            sbin/tc \
             usr/sbin/ethtool \
             usr/sbin/irqbalance \
             usr/sbin/nft \
             usr/sbin/odhcp6c \
-            usr/sbin/tc \
             usr/sbin/tcpdump \
             usr/sbin/wpad; do
             [ -x "$root/$rel" ] || {
