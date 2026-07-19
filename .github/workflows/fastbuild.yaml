@@ -722,7 +722,10 @@ jobs:
               exit 1
             }
           done
-          mapfile -t kernel_configs < <(find build_dir -type f -path "*/linux-6.18.38/.config" -print)
+          mapfile -t kernel_configs < <(
+            find build_dir/target-* -type f \
+              -path "*/linux-airoha_an7581/linux-6.18.38/.config" -print
+          )
           [ "${#kernel_configs[@]}" -ge 1 ] || {
             echo "::error::No final Linux config was found"
             exit 1
@@ -741,7 +744,11 @@ jobs:
               }
             done
           done
-          mapfile -t dtbs < <(find build_dir -type f -name "an7581-w1700k-ubi.dtb" -print)
+          mapfile -t dtbs < <(
+            find build_dir/target-* -type f \
+              -path "*/linux-airoha_an7581/*" \
+              -name "an7581-w1700k-ubi.dtb" -print
+          )
           [ "${#dtbs[@]}" -ge 1 ] || {
             echo "::error::No W1700K DTB was found"
             exit 1
