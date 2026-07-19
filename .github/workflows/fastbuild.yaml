@@ -18,8 +18,8 @@ jobs:
       DK_PROFILE: /bld/user/current
       GH_TOKEN: ${{ github.token }}
       CACHE_EPOCH: gilly19-hw21-v2
-      BUILDER_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:cd751ad00ac9b994b503947f8cb9056ad9a3b15652b629784852b21e0fe66fd5
-      CACHE_SEED_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:1c116f8db4cde4efd79b0c0123de0eb013f1ad51092f7b711568c812187fc9c4
+      BUILDER_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:c68acb0d5632cdd7df1551a3b136a8af102cfde09890aaba58d43ea4c6a47d43
+      CACHE_SEED_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:a4acde526ff635203e2fcce18afede6892a5f6797c30ae27f2ec5ef4a15cc544
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
