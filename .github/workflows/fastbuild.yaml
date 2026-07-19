@@ -605,7 +605,7 @@ jobs:
             usr/libexec/npu-jitter-daemon \
             usr/libexec/rpcd/luci.airoha_flowsense \
             usr/libexec/rpcd/luci.fan \
-            sbin/tc \
+            usr/libexec/tc-full \
             usr/sbin/ethtool \
             usr/sbin/irqbalance \
             usr/sbin/nft \
