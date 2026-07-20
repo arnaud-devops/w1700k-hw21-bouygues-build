@@ -497,11 +497,11 @@ jobs:
             exit 1
           }
           export PATH="$PWD/staging_dir/host/bin:$PATH"
-          if ! find staging_dir -path "*/toolchain-*/lib/libgcc_s.so.*" \
+          if ! find -L staging_dir -path "*/toolchain-*/lib/libgcc_s.so.*" \
             -print -quit | grep -q .; then
             FORCE_UNSAFE_CONFIGURE=1 make toolchain/install -j$(nproc) V=s
           fi
-          find staging_dir -path "*/toolchain-*/lib/libgcc_s.so.*" \
+          find -L staging_dir -path "*/toolchain-*/lib/libgcc_s.so.*" \
             -print -quit | grep -q . || {
             echo "::error::toolchain/install did not stage target libgcc"
             exit 1
