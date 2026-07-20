@@ -14,7 +14,9 @@ source; the binary image from Gilly is not repackaged.
 
 ## Status
 
-The first v2 release remains a prerelease labelled:
+The first v2 candidate was built, published and independently audited offline
+on 2026-07-20. The build and content checks passed, but the image has not been
+flashed on physical hardware. It therefore remains a prerelease labelled:
 
 ```text
 [UNTESTED ON HW2.1 - DO NOT FLASH YET]
@@ -25,6 +27,10 @@ No workflow in this repository connects to the router.
 
 The active router remains on the separately validated Gilly 17.07 image until
 an explicit hardware-test decision is made.
+
+- [GitHub Actions run 29710168602](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/29710168602)
+- [Untested v2 prerelease](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.20_r0%2B35431-4f2dc5cc64_e7257d1)
+- [Independent audit](AUDIT-2026-07-20.md)
 
 ## Pinned source
 
@@ -134,6 +140,9 @@ The workflow validates the assembled rootfs, kernel configuration, final DTB,
 driver/firmware policy, executable modes, TLS stack, recovery files and package
 manifest before creating an untested prerelease. Release assets receive GitHub
 build-provenance attestations.
+
+The first published v2 image is 22,459,294 bytes and has SHA-256
+`4a6152fa0dd6fffeed9855747003e8fc008fd24b6ab1441425f0ec595a0440b7`.
 
 ## Hardware gate
 
