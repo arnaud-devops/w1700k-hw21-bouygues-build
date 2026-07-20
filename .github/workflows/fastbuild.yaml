@@ -498,35 +498,33 @@ jobs:
             exit 1
           }
           export PATH="$PWD/staging_dir/host/bin:$PATH"
-          if ! find -L staging_dir -path "*/toolchain-*/lib/libgcc_s.so.*" \
-            -print -quit | grep -q .; then
+          shopt -s nullglob
+          libgcc_files=(staging_dir/toolchain-*/lib/libgcc_s.so.*)
+          if [ "${#libgcc_files[@]}" -eq 0 ]; then
             FORCE_UNSAFE_CONFIGURE=1 make toolchain/install -j$(nproc) V=s
+            libgcc_files=(staging_dir/toolchain-*/lib/libgcc_s.so.*)
           fi
-          find -L staging_dir -path "*/toolchain-*/lib/libgcc_s.so.*" \
-            -print -quit | grep -q . || {
+          [ "${#libgcc_files[@]}" -gt 0 ] || {
             echo "::error::toolchain/install did not stage target libgcc"
             exit 1
           }
-          uboot_image=$(find -L staging_dir -path \
-            "*/image/an7581_gemtek_w1700k-u-boot.bin.lzma" -print -quit)
-          uboot_dtb=$(find -L staging_dir -path \
-            "*/image/an7581_gemtek_w1700k-u-boot.dtb" -print -quit)
-          if [ ! -s "$uboot_image" ] || [ ! -s "$uboot_dtb" ]; then
+          uboot_images=(staging_dir/target-*/image/an7581_gemtek_w1700k-u-boot.bin.lzma)
+          uboot_dtbs=(staging_dir/target-*/image/an7581_gemtek_w1700k-u-boot.dtb)
+          if [ "${#uboot_images[@]}" -ne 1 ] || [ "${#uboot_dtbs[@]}" -ne 1 ]; then
             FORCE_UNSAFE_CONFIGURE=1 make package/boot/uboot-airoha/compile \
               -j$(nproc) V=s
-            uboot_image=$(find -L staging_dir -path \
-              "*/image/an7581_gemtek_w1700k-u-boot.bin.lzma" -print -quit)
-            uboot_dtb=$(find -L staging_dir -path \
-              "*/image/an7581_gemtek_w1700k-u-boot.dtb" -print -quit)
+            uboot_images=(staging_dir/target-*/image/an7581_gemtek_w1700k-u-boot.bin.lzma)
+            uboot_dtbs=(staging_dir/target-*/image/an7581_gemtek_w1700k-u-boot.dtb)
           fi
-          [ -s "$uboot_image" ] || {
-            echo "::error::The W1700K chainloader U-Boot image was not staged"
+          if [ "${#uboot_images[@]}" -ne 1 ] || [ ! -s "${uboot_images[0]}" ]; then
+            echo "::error::Expected one staged W1700K chainloader U-Boot image"
             exit 1
-          }
-          [ -s "$uboot_dtb" ] || {
-            echo "::error::The W1700K chainloader U-Boot DTB was not staged"
+          fi
+          if [ "${#uboot_dtbs[@]}" -ne 1 ] || [ ! -s "${uboot_dtbs[0]}" ]; then
+            echo "::error::Expected one staged W1700K chainloader U-Boot DTB"
             exit 1
-          }
+          fi
+          shopt -u nullglob
           grep -Fq "append('"'"'unsol_bcast_probe_resp_interval'"'"', 20);" \
             package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
           grep -Fq "config.eht_su_beamformer ??= 1;" \
