@@ -487,7 +487,7 @@ jobs:
           # A new cache epoch can legitimately start without host tools. The
           # direct wifi-scripts package target does not bootstrap them first.
           if [ ! -x staging_dir/host/bin/sed ]; then
-            make tools/install -j$(nproc) V=s
+            FORCE_UNSAFE_CONFIGURE=1 make tools/install -j$(nproc) V=s
           fi
           grep -Fq "append('"'"'unsol_bcast_probe_resp_interval'"'"', 20);" \
             package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
