@@ -751,18 +751,24 @@ jobs:
             echo "::error::No W1700K DTB was found"
             exit 1
           }
-          fdtget=staging_dir/host/bin/fdtget
-          [ -x "$fdtget" ] || {
-            echo "::error::Host fdtget is unavailable"
+          dtc=${kernel_configs[0]%/.config}/scripts/dtc/dtc
+          [ -x "$dtc" ] || {
+            echo "::error::The target kernel device-tree compiler is unavailable: $dtc"
             exit 1
           }
           printf "Validating W1700K DTBs:\n%s\n" "${dtbs[*]}"
           for dtb in "${dtbs[@]}"; do
-            "$fdtget" -l "$dtb" /reserved-memory | grep -qx "ramoops@86ff0000" || {
+            if ! dtb_dump=$("$dtc" -I dtb -O dts "$dtb" 2>/dev/null); then
+              echo "::error::The generated W1700K DTB cannot be decoded: $dtb"
+              exit 1
+            fi
+            ramoops_node=$(printf "%s\n" "$dtb_dump" | sed -n "/ramoops@86ff0000 {/,/};/p")
+            [ -n "$ramoops_node" ] || {
               echo "::error::The W1700K DTB has no ramoops node: $dtb"
               exit 1
             }
-            [ "$("$fdtget" -tx "$dtb" /reserved-memory/ramoops@86ff0000 reg)" = "0 86ff0000 0 10000" ] || {
+            printf "%s\n" "$ramoops_node" | grep -Eq \
+              "reg[[:space:]]*=[[:space:]]*<0x0+[[:space:]]+0x86ff0000[[:space:]]+0x0+[[:space:]]+0x10000>;" || {
               echo "::error::The W1700K DTB ramoops reservation is not 64 KiB at 0x86ff0000: $dtb"
               exit 1
             }
