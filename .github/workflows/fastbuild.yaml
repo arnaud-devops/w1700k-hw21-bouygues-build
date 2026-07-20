@@ -489,8 +489,11 @@ jobs:
           if [ ! -x staging_dir/host/bin/sed ]; then
             FORCE_UNSAFE_CONFIGURE=1 make tools/install -j$(nproc) V=s
           fi
+          if [ ! -x staging_dir/host/bin/ccache ]; then
+            FORCE_UNSAFE_CONFIGURE=1 make tools/ccache/compile -j$(nproc) V=s
+          fi
           [ -x staging_dir/host/bin/ccache ] || {
-            echo "::error::Host ccache is missing after tools/install"
+            echo "::error::tools/ccache/compile did not install host ccache"
             exit 1
           }
           export PATH="$PWD/staging_dir/host/bin:$PATH"
