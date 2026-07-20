@@ -29,7 +29,7 @@ check_command() {
 	fi
 }
 
-printf 'W1700K HW2.1 Bouygues v2 health check\n'
+printf 'W1700K HW2.1 Bouygues v2.1 health check\n'
 # shellcheck disable=SC1091
 printf 'release=%s kernel=%s\n' \
 	"$(. /etc/openwrt_release 2>/dev/null; printf '%s' "${DISTRIB_REVISION:-unknown}")" \
@@ -97,11 +97,25 @@ for section in $(uci -q show wireless 2>/dev/null |
 	[ "$(uci -q get "wireless.$section.disabled")" = 1 ] && continue
 	configured_aps=$((configured_aps + 1))
 done
-hostapd_aps="$(ubus list 'hostapd.*' 2>/dev/null | awk 'END { print NR + 0 }')"
-if [ "$configured_aps" -eq "$hostapd_aps" ]; then
-	pass "$configured_aps configured APs have hostapd objects"
+enabled_hostapd_aps=0
+up_hostapd_aps=0
+for hostapd_object in $(ubus list 'hostapd.*' 2>/dev/null); do
+	[ "$(ubus call "$hostapd_object" get_status 2>/dev/null |
+		jsonfilter -e '@.status' 2>/dev/null)" = ENABLED ] || continue
+	enabled_hostapd_aps=$((enabled_hostapd_aps + 1))
+	ap_name="${hostapd_object#hostapd.}"
+	[ "$(cat "/sys/class/net/$ap_name/operstate" 2>/dev/null)" = up ] || continue
+	up_hostapd_aps=$((up_hostapd_aps + 1))
+done
+if [ "$enabled_hostapd_aps" -ge "$configured_aps" ]; then
+	pass "$configured_aps configured APs have enabled hostapd objects"
 else
-	fail "configured APs=$configured_aps hostapd objects=$hostapd_aps"
+	fail "configured APs=$configured_aps enabled hostapd=$enabled_hostapd_aps"
+fi
+if [ "$up_hostapd_aps" -ge "$configured_aps" ]; then
+	pass "$configured_aps configured APs have operational netdevs"
+else
+	fail "configured APs=$configured_aps operational hostapd netdevs=$up_hostapd_aps"
 fi
 
 if [ "$(uci -q get irqbalance.irqbalance.enabled)" = 1 ]; then
@@ -110,6 +124,12 @@ else
 	warn 'irqbalance is disabled'
 fi
 check_command 'Watchcat running' /etc/init.d/watchcat status
+
+if [ "$(uci -q get npu-monitor.jitter.enabled)" = 1 ]; then
+	check_command 'FlowSense jitter probe enabled and running' /etc/init.d/npu-jitter status
+else
+	pass 'FlowSense jitter probe disabled by default policy'
+fi
 
 /usr/local/sbin/w1700k-pstore-collect --status || warn 'pstore is unavailable'
 

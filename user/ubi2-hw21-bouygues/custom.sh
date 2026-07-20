@@ -34,9 +34,25 @@ fi
 	exit 1
 }
 
-grep -Fq 'rtl8261ce_match_phy_device' \
+grep -Fq '!genphy_match_phy_device(phydev, phydrv)' \
 	target/linux/generic/files/drivers/net/phy/rtl8261ce/rtk_rtl8261ce_phy.c || {
-	echo "strict RTL8261CE matcher is missing" >&2
+	echo "RTL8261CE generic vendor/model guard is missing" >&2
+	exit 1
+}
+
+recovery=package/w1700k-hw21-bouygues-support/files/usr/local/sbin/restore-dnsproxy-after-sysupgrade
+grep -Fq 'ubus call "$hostapd_object" get_status' "$recovery" || {
+	echo "hostapd-aware Wi-Fi recovery check is missing" >&2
+	exit 1
+}
+
+grep -Eq "^[[:space:]]*option enabled .0.$" package/luci-app-airoha-flowsense/root/etc/config/npu-monitor || {
+	echo "FlowSense jitter probe is not disabled by default" >&2
+	exit 1
+}
+grep -Fq 'config_get_bool enabled jitter enabled 0' \
+	package/luci-app-airoha-flowsense/root/etc/init.d/npu-jitter || {
+	echo "FlowSense jitter service does not enforce its opt-in policy" >&2
 	exit 1
 }
 

@@ -19,7 +19,7 @@ Feed commits are stored separately in `feeds.lock`.
 Every entry selected by Gilly's `openwrt-patches/openwrt-add-patch` at the
 pinned commit is copied to the same OpenWrt destination. This includes:
 
-- strict RTL8261CE driver and integration;
+- RTL8261CE driver and its CE-vs-N PMA model discrimination;
 - patch `971` for IPv6 UPDMEM source-MAC synchronization;
 - mt7996 radar attribution, EHT, tx-power and hardening patches;
 - NPU firmware and Airoha/QDMA/thermal fixes;
@@ -32,7 +32,7 @@ the builder. PR 24038 and the `bridger` package are not imported.
 
 ## Intentional local source changes
 
-Four Gilly-provided source files differ by content:
+Seven Gilly-provided source files differ by content:
 
 1. `target/linux/airoha/dts/an7581.dtsi`
 
@@ -51,6 +51,21 @@ Four Gilly-provided source files differ by content:
    changed to `$(TOPDIR)/feeds/luci/luci.mk` because this builder installs
    custom applications under `package/`, while Gilly's helper places them in
    `feeds/luci/applications/`.
+
+5. `target/linux/generic/files/drivers/net/phy/rtl8261ce/rtk_rtl8261ce_phy.c`
+
+   Preserves phylib's generic Realtek vendor/model match before applying
+   Gilly's PMA/PMD CE-model check. A custom callback otherwise replaces the
+   generic PHY-ID matcher instead of augmenting it.
+
+6. `package/luci-app-airoha-flowsense/root/etc/config/npu-monitor`
+
+7. `package/luci-app-airoha-flowsense/root/etc/init.d/npu-jitter`
+
+   Make the permanent two-second external jitter probe opt-in. The service
+   remains installed for FlowSense but starts its daemon only when
+   `npu-monitor.jitter.enabled=1`. The FlowSense package release is bumped to
+   carry these changes.
 
 The custom LuCI applications and `w1700k-hw21-bouygues-support` package are
 additional package directories; they do not edit the Gilly driver patches.

@@ -17,7 +17,7 @@ jobs:
       DK_USER: /bld/user
       DK_PROFILE: /bld/user/current
       GH_TOKEN: ${{ github.token }}
-      CACHE_EPOCH: gilly19-hw21-v2
+      CACHE_EPOCH: gilly19-hw21-v2.1
       UPSTREAM_BUILDER_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:88dac182e7327e61d76aba0836d1c16924cee7fd0407b41e561d1fb514b3acd9
       BUILDER_IMAGE: ghcr.io/${{ github.repository_owner }}/w1700k-hw21-bouygues-builder@sha256:88dac182e7327e61d76aba0836d1c16924cee7fd0407b41e561d1fb514b3acd9
       BUILDER_MIRROR_TAG: ghcr.io/${{ github.repository_owner }}/w1700k-hw21-bouygues-builder:fastbuild-base-88dac182e732
@@ -327,9 +327,24 @@ jobs:
             echo "::error::The mt7996 radar attribution fix is missing"
             exit 1
           }
-          grep -Fq "rtl8261ce_match_phy_device" \
+          grep -Fq "!genphy_match_phy_device(phydev, phydrv)" \
             target/linux/generic/files/drivers/net/phy/rtl8261ce/rtk_rtl8261ce_phy.c || {
-            echo "::error::The strict RTL8261CE matcher is missing"
+            echo "::error::The RTL8261CE generic vendor/model guard is missing"
+            exit 1
+          }
+          recovery=package/w1700k-hw21-bouygues-support/files/usr/local/sbin/restore-dnsproxy-after-sysupgrade
+          grep -Fq "ubus call \"\$hostapd_object\" get_status" "$recovery" || {
+            echo "::error::The hostapd-aware Wi-Fi recovery check is missing"
+            exit 1
+          }
+          grep -Eq "^[[:space:]]*option enabled .0.$" \
+            package/luci-app-airoha-flowsense/root/etc/config/npu-monitor || {
+            echo "::error::The FlowSense jitter probe is not disabled by default"
+            exit 1
+          }
+          grep -Fq "config_get_bool enabled jitter enabled 0" \
+            package/luci-app-airoha-flowsense/root/etc/init.d/npu-jitter || {
+            echo "::error::The FlowSense jitter service does not enforce opt-in"
             exit 1
           }
           grep -Fq "ramoops@86ff0000" target/linux/airoha/dts/an7581.dtsi || {
@@ -675,6 +690,20 @@ jobs:
             echo "::error::The br-lan IPv6 bridge netfilter hook is missing"
             exit 1
           }
+          grep -Fq "ubus call \"\$hostapd_object\" get_status" \
+            "$root/usr/local/sbin/restore-dnsproxy-after-sysupgrade" || {
+            echo "::error::The rootfs lacks the hostapd-aware Wi-Fi recovery check"
+            exit 1
+          }
+          grep -Eq "^[[:space:]]*option enabled .0.$" "$root/etc/config/npu-monitor" || {
+            echo "::error::The rootfs enables the FlowSense jitter probe by default"
+            exit 1
+          }
+          grep -Fq "config_get_bool enabled jitter enabled 0" \
+            "$root/etc/init.d/npu-jitter" || {
+            echo "::error::The rootfs jitter service does not enforce opt-in"
+            exit 1
+          }
           for rel in \
             usr/share/ucode/wifi/ap.uc \
             usr/share/ucode/wifi/hostapd.uc; do
@@ -968,7 +997,11 @@ jobs:
             echo "::error::Unexpected irqbalance version in $manifest"
             exit 1
           }
-          grep -q '^w1700k-hw21-bouygues-support - 2\.0\.0-r1$' "$manifest" || {
+          grep -q '^luci-app-airoha-flowsense - 1\.1\.3-r3$' "$manifest" || {
+            echo "::error::Unexpected FlowSense version in $manifest"
+            exit 1
+          }
+          grep -q '^w1700k-hw21-bouygues-support - 2\.1\.0-r1$' "$manifest" || {
             echo "::error::Unexpected profile support package version in $manifest"
             exit 1
           }

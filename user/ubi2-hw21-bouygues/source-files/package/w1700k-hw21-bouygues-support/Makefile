@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=w1700k-hw21-bouygues-support
-PKG_VERSION:=2.0.0
+PKG_VERSION:=2.1.0
 PKG_RELEASE:=1
 PKGARCH:=all
 PKG_LICENSE:=GPL-2.0-only

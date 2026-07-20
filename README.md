@@ -15,8 +15,13 @@ source; the binary image from Gilly is not repackaged.
 ## Status
 
 The first v2 candidate was built, published and independently audited offline
-on 2026-07-20. The build and content checks passed, but the image has not been
-flashed on physical hardware. It therefore remains a prerelease labelled:
+on 2026-07-20. Its integrity and content checks passed, but a second source
+review found two specification gaps: the RTL8261CE callback lacks the generic
+PHY-ID guard, and Wi-Fi recovery does not verify the real hostapd state. The
+image has not been flashed and is superseded for testing purposes. The current
+v2.1 source fixes both gaps and makes the FlowSense jitter probe opt-in; its
+next image must pass CI and the independent offline audit before hardware use.
+The first release remains labelled:
 
 ```text
 [UNTESTED ON HW2.1 - DO NOT FLASH YET]
@@ -46,7 +51,7 @@ All five OpenWrt feeds are pinned in
 [`feeds.lock`](user/ubi2-hw21-bouygues/feeds.lock). The source overlay,
 profile files and build hook have independent SHA-256 locks.
 
-Detailed provenance and the four intentional local source changes are recorded
+Detailed provenance and the seven intentional local source changes are recorded
 in [`UPSTREAM-SOURCES.md`](user/ubi2-hw21-bouygues/UPSTREAM-SOURCES.md).
 
 ## Network and PPE policy
@@ -74,8 +79,9 @@ found in the applied source tree.
 
 The image keeps Gilly 19.07's:
 
-- strict RTL8261CE matcher, allowing the CE and mainline RTL8261N drivers to
-  coexist in a universal source tree;
+- RTL8261CE PMA model check, allowing CE model `0x9` and RTL8261N model `0x2f`
+  to be distinguished in a universal source tree; v2.1 also preserves
+  phylib's generic Realtek vendor/model guard;
 - NPU and MT7996 firmware;
 - mt7996 radar `chanctx` attribution fix;
 - Wi-Fi 6/6E/7 ucode behavior and EHT beamforming defaults;
@@ -92,6 +98,7 @@ after compilation.
 ## Included administration and tools
 
 - FlowSense and Airoha NPU status panels
+- FlowSense jitter probe installed but disabled by default
 - MLO and Wi-Fi 7 panels
 - full OpenSSL-backed LuCI HTTPS stack
 - `dnsmasq-full` and `dnsproxy 0.83.0`
@@ -106,6 +113,17 @@ after compilation.
 Attended Sysupgrade, `owut`, `bridger`, `ttyd`, the LuCI file manager and the
 router-hosted speed-test server are excluded.
 
+The optional FlowSense latency metric can be enabled explicitly with:
+
+```sh
+uci set npu-monitor.jitter.enabled='1'
+uci commit npu-monitor
+/etc/init.d/npu-jitter restart
+```
+
+Leaving the option at `0` keeps the daemon stopped and sends no periodic
+probe.
+
 ## Recovery package
 
 `w1700k-hw21-bouygues-support` is built into the image and owns the profile's
@@ -113,7 +131,8 @@ recovery and diagnostics files. It provides:
 
 - post-sysupgrade restoration of `dnsproxy` and full `wpad-openssl`;
 - AdGuard Unfiltered DoQ primary, NextDNS DoQ fallback and DNS.SB bootstrap;
-- real hostapd/AP checks, including DFS CAC wait time;
+- real `hostapd.*` and AP-netdev checks, including DFS CAC wait time, with
+  `flock` serialization;
 - serialized Watchcat recovery of `wan` and `wan6` without automatic reboot;
 - pstore collection without clearing crash records automatically;
 - a redaction-safe `w1700k-healthcheck` command.

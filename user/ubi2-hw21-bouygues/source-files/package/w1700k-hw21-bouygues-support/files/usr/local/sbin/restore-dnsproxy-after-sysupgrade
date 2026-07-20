@@ -73,15 +73,25 @@ configured_ap_count() {
 	printf '%s\n' "$ap_count"
 }
 
-active_hostapd_count() {
-	ubus list 'hostapd.*' 2>/dev/null | awk 'END { print NR + 0 }'
+enabled_hostapd_count() {
+	enabled_count=0
+	for hostapd_object in $(ubus list 'hostapd.*' 2>/dev/null); do
+		[ "$(ubus call "$hostapd_object" get_status 2>/dev/null |
+			jsonfilter -e '@.status' 2>/dev/null)" = "ENABLED" ] || continue
+		enabled_count=$((enabled_count + 1))
+	done
+	printf '%s\n' "$enabled_count"
 }
 
 up_ap_interface_count() {
 	up_count=0
-	for ap_path in /sys/class/net/*-ap*; do
+	for hostapd_object in $(ubus list 'hostapd.*' 2>/dev/null); do
+		ap_name="${hostapd_object#hostapd.}"
+		ap_path="/sys/class/net/$ap_name"
 		[ -e "$ap_path" ] || continue
 		[ "$(cat "$ap_path/operstate" 2>/dev/null)" = "up" ] || continue
+		[ "$(ubus call "$hostapd_object" get_status 2>/dev/null |
+			jsonfilter -e '@.status' 2>/dev/null)" = "ENABLED" ] || continue
 		up_count=$((up_count + 1))
 	done
 	printf '%s\n' "$up_count"
@@ -90,7 +100,7 @@ up_ap_interface_count() {
 wireless_aps_are_ready() {
 	expected_count="$(configured_ap_count)"
 	[ "$expected_count" -eq 0 ] && return 0
-	[ "$(active_hostapd_count)" -ge "$expected_count" ] &&
+	[ "$(enabled_hostapd_count)" -ge "$expected_count" ] &&
 		[ "$(up_ap_interface_count)" -ge "$expected_count" ]
 }
 
@@ -114,7 +124,7 @@ show_status() {
 	printf 'wifi_required_wpad='
 	yes_no required_wpad_is_installed
 	printf 'wifi_expected_aps=%s\n' "$(configured_ap_count)"
-	printf 'wifi_hostapd_aps=%s\n' "$(active_hostapd_count)"
+	printf 'wifi_hostapd_aps=%s\n' "$(enabled_hostapd_count)"
 	printf 'wifi_up_aps=%s\n' "$(up_ap_interface_count)"
 	printf 'wifi_aps_ready='
 	yes_no wireless_aps_are_ready

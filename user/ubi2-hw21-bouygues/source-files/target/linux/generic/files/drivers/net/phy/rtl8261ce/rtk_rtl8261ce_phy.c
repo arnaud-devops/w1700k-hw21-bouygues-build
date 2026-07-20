@@ -1097,7 +1097,7 @@ static int rtl8261ce_match_phy_device(struct phy_device *phydev,
 {
 	int phyid2;
 
-	if (!phydev->is_c45)
+	if (!phydev->is_c45 || !genphy_match_phy_device(phydev, phydrv))
 		return 0;
 
 	phyid2 = phy_read_mmd(phydev, MDIO_MMD_PMAPMD, MDIO_DEVID2);

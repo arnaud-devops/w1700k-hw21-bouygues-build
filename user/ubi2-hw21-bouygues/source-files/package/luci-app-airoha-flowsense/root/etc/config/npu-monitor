@@ -1,2 +1,3 @@
 config jitter
+	option enabled '0'
 	option target '1.1.1.1'
