@@ -404,6 +404,7 @@ jobs:
             CONFIG_PACKAGE_openssh-sftp-server=y \
             CONFIG_PACKAGE_sqm-scripts=y \
             CONFIG_PACKAGE_tc-full=y \
+            CONFIG_PACKAGE_u-boot-an7581_gemtek_w1700k=y \
             CONFIG_PACKAGE_watchcat=y \
             CONFIG_PACKAGE_w1700k-hw21-bouygues-support=y \
             CONFIG_PACKAGE_wpad-openssl=y; do
@@ -504,6 +505,26 @@ jobs:
           find -L staging_dir -path "*/toolchain-*/lib/libgcc_s.so.*" \
             -print -quit | grep -q . || {
             echo "::error::toolchain/install did not stage target libgcc"
+            exit 1
+          }
+          uboot_image=$(find -L staging_dir -path \
+            "*/image/an7581_gemtek_w1700k-u-boot.bin.lzma" -print -quit)
+          uboot_dtb=$(find -L staging_dir -path \
+            "*/image/an7581_gemtek_w1700k-u-boot.dtb" -print -quit)
+          if [ ! -s "$uboot_image" ] || [ ! -s "$uboot_dtb" ]; then
+            FORCE_UNSAFE_CONFIGURE=1 make package/boot/uboot-airoha/compile \
+              -j$(nproc) V=s
+            uboot_image=$(find -L staging_dir -path \
+              "*/image/an7581_gemtek_w1700k-u-boot.bin.lzma" -print -quit)
+            uboot_dtb=$(find -L staging_dir -path \
+              "*/image/an7581_gemtek_w1700k-u-boot.dtb" -print -quit)
+          fi
+          [ -s "$uboot_image" ] || {
+            echo "::error::The W1700K chainloader U-Boot image was not staged"
+            exit 1
+          }
+          [ -s "$uboot_dtb" ] || {
+            echo "::error::The W1700K chainloader U-Boot DTB was not staged"
             exit 1
           }
           grep -Fq "append('"'"'unsol_bcast_probe_resp_interval'"'"', 20);" \
