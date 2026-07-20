@@ -14,14 +14,11 @@ source; the binary image from Gilly is not repackaged.
 
 ## Status
 
-The first v2 candidate was built, published and independently audited offline
-on 2026-07-20. Its integrity and content checks passed, but a second source
-review found two specification gaps: the RTL8261CE callback lacks the generic
-PHY-ID guard, and Wi-Fi recovery does not verify the real hostapd state. The
-image has not been flashed and is superseded for testing purposes. The current
-v2.1 source fixes both gaps and makes the FlowSense jitter probe opt-in; its
-next image must pass CI and the independent offline audit before hardware use.
-The first release remains labelled:
+The corrected v2.1 candidate was built, published and independently audited
+offline on 2026-07-20. It fixes both second-pass v2 findings, makes the
+FlowSense jitter probe opt-in, and builds the W1700K chainloader dependency
+without relying on an inherited cache. The image has not been flashed and
+remains labelled:
 
 ```text
 [UNTESTED ON HW2.1 - DO NOT FLASH YET]
@@ -33,9 +30,9 @@ No workflow in this repository connects to the router.
 The active router remains on the separately validated Gilly 17.07 image until
 an explicit hardware-test decision is made.
 
-- [GitHub Actions run 29710168602](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/29710168602)
-- [Untested v2 prerelease](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.20_r0%2B35431-4f2dc5cc64_e7257d1)
-- [Independent audit](AUDIT-2026-07-20.md)
+- [GitHub Actions run 29771406982](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/29771406982)
+- [Untested v2.1 prerelease](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.20_r0%2B35431-4f2dc5cc64_f5b2b5d)
+- [Independent v2.1 audit](AUDIT-2026-07-20-V2.1.md)
 
 ## Pinned source
 
@@ -160,8 +157,10 @@ driver/firmware policy, executable modes, TLS stack, recovery files and package
 manifest before creating an untested prerelease. Release assets receive GitHub
 build-provenance attestations.
 
-The first published v2 image is 22,459,294 bytes and has SHA-256
-`4a6152fa0dd6fffeed9855747003e8fc008fd24b6ab1441425f0ec595a0440b7`.
+The corrected v2.1 image is 22,459,294 bytes and has SHA-256
+`c7e4cdb2da68423d5c3906f412fdf50792a96b7a823c36b7152febd2fa252d3d`.
+The first v2 image is superseded; its audit and findings remain in
+[`AUDIT-2026-07-20.md`](AUDIT-2026-07-20.md).
 
 ## Hardware gate
 

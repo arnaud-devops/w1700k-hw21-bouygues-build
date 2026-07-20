@@ -82,5 +82,8 @@ additional package directories; they do not edit the Gilly driver patches.
 
 The workflow compares these locks before `make defconfig`, rejects missing
 `971` or present `965`, and checks the final kernel config and DTB after the
-build. The cache seed is a best-effort performance optimization and is not a
-source of files included in the firmware.
+build. The UBI2 profile explicitly selects the W1700K U-Boot package and the
+workflow verifies its compressed image and DTB before image generation; this
+avoids relying on a chainloader file inherited from a build cache. The cache
+seed is a best-effort performance optimization and is not a source of files
+included in the firmware.
