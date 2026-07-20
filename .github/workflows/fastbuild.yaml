@@ -745,7 +745,7 @@ jobs:
             done
           done
           mapfile -t dtbs < <(
-            find build_dir -type f -name "an7581-w1700k-ubi.dtb" -print
+            find build_dir -type f -name "image-an7581-w1700k-ubi.dtb" -print
           )
           [ "${#dtbs[@]}" -ge 1 ] || {
             echo "::error::No W1700K DTB was found"
