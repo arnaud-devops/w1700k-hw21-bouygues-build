@@ -489,6 +489,11 @@ jobs:
           if [ ! -x staging_dir/host/bin/sed ]; then
             FORCE_UNSAFE_CONFIGURE=1 make tools/install -j$(nproc) V=s
           fi
+          [ -x staging_dir/host/bin/ccache ] || {
+            echo "::error::Host ccache is missing after tools/install"
+            exit 1
+          }
+          export PATH="$PWD/staging_dir/host/bin:$PATH"
           grep -Fq "append('"'"'unsol_bcast_probe_resp_interval'"'"', 20);" \
             package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
           grep -Fq "config.eht_su_beamformer ??= 1;" \
