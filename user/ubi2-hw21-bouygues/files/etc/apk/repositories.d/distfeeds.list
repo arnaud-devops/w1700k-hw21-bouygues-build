@@ -1,7 +1,9 @@
-# Restricted for this custom image. These snapshot indexes are rolling, but
-# the patched kernel deliberately has no generic OpenWrt kmod feed and every
-# required kernel module is built into the image.
+# The kmods feed below is intentionally enabled through Fanboy's forced
+# buildbot vermagic policy. Preinstalled modules are still built locally, but
+# post-installing an official kmod is not proof of ABI compatibility with this
+# patched kernel. Keep the exact version/release/hash tuple pinned.
 https://downloads.openwrt.org/snapshots/targets/airoha/an7581/packages/packages.adb
+https://downloads.openwrt.org/snapshots/targets/airoha/an7581/kmods/6.18.39-1-7a95fc2977560f4c28e39a71bf89c960/packages.adb
 https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/base/packages.adb
 https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/luci/packages.adb
 https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/packages/packages.adb

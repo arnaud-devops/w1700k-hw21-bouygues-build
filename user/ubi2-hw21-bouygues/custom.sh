@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-# This profile has no generic online-upgrade client. Do not expose inherited
-# helpers that download unrelated images or overwrite the pinned Gilly patch.
+# The profile includes official owut/Attended Sysupgrade, but not Fanboy's
+# separate CGI download helpers, which target unrelated generic images.
 rm -f \
 	files/998-single-wiphy.patch \
 	files/overview.js \

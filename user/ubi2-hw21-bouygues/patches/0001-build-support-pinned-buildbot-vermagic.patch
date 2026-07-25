@@ -1,0 +1,10 @@
+--- include/feeds.mk
++++ include/feeds.mk
+@@ -56,2 +56 @@
+-	$(if $(CONFIG_BUILDBOT), \
+-		echo '%U/targets/%S/kmods/$(LINUX_VERSION)-$(LINUX_RELEASE)-$(LINUX_VERMAGIC)/packages.adb';) \
++	echo '%U/targets/%S/kmods/$(LINUX_VERSION)-$(LINUX_RELEASE)-$(LINUX_VERMAGIC)/packages.adb'; \
+--- include/kernel-defaults.mk
++++ include/kernel-defaults.mk
+@@ -129,0 +130 @@
++	[ ! -f ../../../files/etc/vermagic.txt ] || cp ../../../files/etc/vermagic.txt $(LINUX_DIR)/.vermagic

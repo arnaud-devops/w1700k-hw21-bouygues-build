@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=w1700k-hw21-bouygues-support
-PKG_VERSION:=2.2.0
+PKG_VERSION:=2.3.0
 PKG_RELEASE:=1
 PKGARCH:=all
 PKG_LICENSE:=GPL-2.0-only
@@ -25,6 +25,8 @@ define Build/Compile
 endef
 
 define Package/w1700k-hw21-bouygues-support/install
+	$(INSTALL_DIR) $(1)/etc
+	$(INSTALL_DATA) ./files/etc/vermagic.txt $(1)/etc/vermagic.txt
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
 	$(INSTALL_BIN) ./files/etc/hotplug.d/iface/95-dnsproxy-restore \
 		$(1)/etc/hotplug.d/iface/95-dnsproxy-restore

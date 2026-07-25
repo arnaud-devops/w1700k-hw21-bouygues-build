@@ -1,4 +1,4 @@
-# Custom v2.2 upstream source map
+# Custom v2.3 upstream source map
 
 This profile is a source build based on the Gilly 21.07 universal image. It
 does not modify or repack Gilly's binary firmware.
@@ -10,6 +10,7 @@ does not modify or repack Gilly's binary firmware.
 | OpenWrt base | `openwrt/openwrt` | `0f256a0a7adf5741e4a061f59a08cd01c14dc526` |
 | HW2.1/kernel/Wi-Fi patchset | `Gilly1970/Gemtek-W1700K-6.18` | `e6a4cdcbb05a486dba8871466baa014dd5d97a95` |
 | NPU/MLO/Wi-Fi 7 LuCI applications | `OpenWRT-fanboy/OpenW1700k` | `acbf82b77b96da9b62890db1e0bf82d322602ac0` |
+| Fanboy forced-vermagic reference | `OpenWRT-fanboy/OpenW1700k` | `0abbad3617e535870438189381261bb63a8060e8` |
 | Log viewer | `gSpotx2f/luci-app-log` | `69226866b51f90c35390dfe57875d56d337d8b56` |
 
 Feed commits are stored separately in `feeds.lock`.
@@ -72,12 +73,55 @@ Seven Gilly-provided source files differ by content:
 
 The custom LuCI applications and `w1700k-hw21-bouygues-support` package are
 additional package directories; they do not edit the Gilly driver patches.
+The v2.3 source overlay also vendors Fanboy's `luci-app-netspeedtest` package
+from the pinned application commit. Its declared dependencies select `iperf3`,
+`librespeed-go`, `ca-certificates` and `curl`. The local delta:
+
+- makes two init-script expressions POSIX-safe (`=` instead of `==`, and an
+  explicit `if` instead of `A && B || C`);
+- exposes the official nPerf website in the browser-side client panel;
+- validates the prepare-script arguments and path quoting;
+- quotes the Ookla RPC arguments, uses explicit proxy construction, and
+  extracts only the expected `speedtest` archive member into a temporary file.
+
+The optional Ookla CLI remains an explicit interactive download over HTTPS; it
+is not present in the immutable image. nPerf runs in the administrator's
+browser rather than as a native executable on the router.
+
+## Fanboy general-purpose build policy
+
+`patches/0001-build-support-pinned-buildbot-vermagic.patch` reproduces the two
+relevant build-system changes from Fanboy commit `0abbad3617e5`: generation of
+the target kmods repository outside buildbot jobs and optional replacement of
+the locally computed `.vermagic` with `files/etc/vermagic.txt`.
+
+The profile deliberately enables `CONFIG_ALL_KMODS`. The buildbot hash
+`7a95fc2977560f4c28e39a71bf89c960` and its Linux
+`6.18.39-1` Airoha repository URL are stored and checksummed locally rather
+than fetched dynamically from `w1700k.github.io`. This makes repeated builds
+of the same builder commit deterministic.
+
+The support package owns the identical runtime `/etc/vermagic.txt` without
+marking it as a conffile, avoiding its preservation as user configuration when
+moving to an unrelated image.
+
+The policy does not turn official post-installed modules into locally built
+modules. It only makes APK accept their kernel package dependency. Every
+module preinstalled in the image still comes from the pinned patched source;
+official `kmod-*` packages added later retain an explicit ABI risk.
+
+The profile additionally installs official Attended Sysupgrade, `owut`,
+LAN-bound TLS-enabled `ttyd`, the LuCI file and package managers, and
+LibreSpeed. It keeps the custom DoQ, Watchcat, Wi-Fi recovery, SFTP and
+diagnostics. LibreSpeed is disabled by its package default, and the workflow
+verifies both that setting and ttyd's `@lan` `/bin/login` policy.
 
 ## Reproducibility controls
 
 - source overlay content: `source-files.sha256`
 - rootfs-only profile files: `profile-files.sha256`
 - build hook: `profile-hooks.sha256`
+- direct OpenWrt build-system patch: `profile-patches.sha256`
 - OpenWrt feeds: `feeds.lock`
 - builder container: mirrored into this repository's GHCR namespace from the
   pinned upstream digest, then pulled and verified by digest before use

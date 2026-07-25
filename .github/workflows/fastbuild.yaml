@@ -17,7 +17,7 @@ jobs:
       DK_USER: /bld/user
       DK_PROFILE: /bld/user/current
       GH_TOKEN: ${{ github.token }}
-      CACHE_EPOCH: gilly21-hw21-v2.2
+      CACHE_EPOCH: gilly21-hw21-v2.3-fanboy-tools
       UPSTREAM_BUILDER_IMAGE: ghcr.io/w1700k/fastbuild_base@sha256:88dac182e7327e61d76aba0836d1c16924cee7fd0407b41e561d1fb514b3acd9
       BUILDER_IMAGE: ghcr.io/${{ github.repository_owner }}/w1700k-hw21-bouygues-builder@sha256:88dac182e7327e61d76aba0836d1c16924cee7fd0407b41e561d1fb514b3acd9
       BUILDER_MIRROR_TAG: ghcr.io/${{ github.repository_owner }}/w1700k-hw21-bouygues-builder:fastbuild-base-88dac182e732
@@ -94,10 +94,9 @@ jobs:
         # profile hook and its lock explicitly after merging shared defaults.
         cp -a user/${{ matrix.target }}/custom.sh user/current/custom.sh
         cp -a user/${{ matrix.target }}/profile-hooks.sha256 user/current/profile-hooks.sha256
-        # The shared Fastbuild profile carries legacy online-upgrade CGI files,
-        # an older LuCI patch and direct-register debug helpers. They are not
-        # part of this pinned production image and must not enter its lock or
-        # rootfs merely because user/default was merged first.
+        # The profile uses the official Attended Sysupgrade packages. Legacy
+        # Fanboy CGI download helpers, an older LuCI patch and direct-register
+        # debug helpers remain outside the locked image.
         rm -f \
           user/current/files/998-single-wiphy.patch \
           user/current/files/overview.js \
@@ -257,8 +256,9 @@ jobs:
               rm -f "$profile_actual"
               exit 1
             }
-            if grep -q "/kmods/" "$distfeeds"; then
-              echo "::error::Generic OpenWrt kmod feeds are forbidden for the patched kernel"
+            expected_kmods="https://downloads.openwrt.org/snapshots/targets/airoha/an7581/kmods/6.18.39-1-7a95fc2977560f4c28e39a71bf89c960/packages.adb"
+            if [ "$(grep -Fxc "$expected_kmods" "$distfeeds")" -ne 1 ]; then
+              echo "::error::The exact pinned buildbot kmods feed is missing or duplicated"
               rm -f "$profile_actual"
               exit 1
             fi
@@ -267,11 +267,25 @@ jobs:
               rm -f "$profile_actual"
               exit 1
             fi
-            if [ -e "$bp/files/etc/vermagic.txt" ]; then
-              echo "::error::A forced buildbot kernel vermagic is forbidden"
+            if [ "$(cat "$bp/files/etc/vermagic.txt" 2>/dev/null)" != \
+              "7a95fc2977560f4c28e39a71bf89c960" ]; then
+              echo "::error::The pinned buildbot kernel vermagic is missing or unexpected"
               rm -f "$profile_actual"
               exit 1
             fi
+            ttyd_config=$bp/files/etc/config/ttyd
+            for ttyd_policy in \
+              "^[[:space:]]*option interface .@lan.$" \
+              "^[[:space:]]*option command ./bin/login.$" \
+              "^[[:space:]]*option ssl .1.$" \
+              "^[[:space:]]*option ssl_cert ./etc/uhttpd\\.crt.$" \
+              "^[[:space:]]*option ssl_key ./etc/uhttpd\\.key.$"; do
+              grep -Eq "$ttyd_policy" "$ttyd_config" || {
+                echo "::error::The locked ttyd LAN/TLS policy is incomplete: $ttyd_policy"
+                rm -f "$profile_actual"
+                exit 1
+              }
+            done
             cp -a --no-preserve=ownership,xattr "$bp/files/." files/
             {
               echo
@@ -358,6 +372,22 @@ jobs:
             echo "::error::The 64 KiB ramoops reservation is missing"
             exit 1
           }
+          netspeedtest=package/luci-app-netspeedtest/Makefile
+          grep -Fq "LUCI_DEPENDS:=+iperf3 +librespeed-go +ca-certificates +curl" \
+            "$netspeedtest" || {
+            echo "::error::The pinned Fanboy Net Speedtest package is missing or changed"
+            exit 1
+          }
+          grep -Fq "https://www.nperf.com/fr/" \
+            package/luci-app-netspeedtest/htdocs/luci-static/resources/view/netspeedtest/webspeedtest.js || {
+            echo "::error::The browser-side nPerf client entry is missing"
+            exit 1
+          }
+          cmp "$bp/files/etc/vermagic.txt" \
+            package/w1700k-hw21-bouygues-support/files/etc/vermagic.txt || {
+            echo "::error::The build and runtime vermagic files differ"
+            exit 1
+          }
           {
             echo
             echo "Source overlay checksums:"
@@ -366,6 +396,22 @@ jobs:
           rm -f "$overlay_actual"
           if [ -f "$bp/custom.sh" ]; then
             bash "$bp/custom.sh"
+          fi
+          grep -Fq "[ ! -f ../../../files/etc/vermagic.txt ] || cp" \
+            include/kernel-defaults.mk || {
+            echo "::error::The pinned buildbot vermagic injection hook is missing"
+            exit 1
+          }
+          grep -Fq "kmods/\$(LINUX_VERSION)-\$(LINUX_RELEASE)-\$(LINUX_VERMAGIC)/packages.adb" \
+            include/feeds.mk || {
+            echo "::error::The build-specific kmods repository hook is missing"
+            exit 1
+          }
+          apk_feed_block=$(sed -n \
+            "/define FeedSourcesAppendAPK/,/endef/p" include/feeds.mk)
+          if grep -Fq "\$(if \$(CONFIG_BUILDBOT)" <<< "$apk_feed_block"; then
+            echo "::error::The APK kmods repository is still restricted to buildbot jobs"
+            exit 1
           fi
           # feeds install may have generated target/package metadata before the
           # Gilly overlay replaced an7581.mk and added local packages. cp -a
@@ -386,31 +432,43 @@ jobs:
           fi
           for option in \
             CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi2=y \
+            CONFIG_ALL_KMODS=y \
             CONFIG_BUSYBOX_CONFIG_FLOCK=y \
             CONFIG_JSON_OVERVIEW_IMAGE_INFO=y \
             CONFIG_JSON_CYCLONEDX_SBOM=y \
             CONFIG_PACKAGE_apk-openssl=y \
+            CONFIG_PACKAGE_attendedsysupgrade-common=y \
+            CONFIG_PACKAGE_ca-certificates=y \
             CONFIG_PACKAGE_curl=y \
             CONFIG_PACKAGE_dnsmasq-full=y \
             CONFIG_PACKAGE_dnsproxy=y \
+            CONFIG_PACKAGE_dropbear=y \
             CONFIG_PACKAGE_ethtool-full=y \
             CONFIG_PACKAGE_ip-full=y \
             CONFIG_PACKAGE_irqbalance=y \
             CONFIG_PACKAGE_kmod-ifb=y \
             CONFIG_PACKAGE_kmod-sched-cake=y \
+            CONFIG_PACKAGE_librespeed-go=y \
             CONFIG_PACKAGE_libustream-openssl=y \
             CONFIG_PACKAGE_luci-app-airoha-flowsense=y \
             CONFIG_PACKAGE_luci-app-airoha-npu=y \
+            CONFIG_PACKAGE_luci-app-attendedsysupgrade=y \
+            CONFIG_PACKAGE_luci-app-filemanager=y \
             CONFIG_PACKAGE_luci-app-irqbalance=y \
             CONFIG_PACKAGE_luci-app-log-viewer=y \
             CONFIG_PACKAGE_luci-app-mlo=y \
+            CONFIG_PACKAGE_luci-app-netspeedtest=y \
+            CONFIG_PACKAGE_luci-app-package-manager=y \
             CONFIG_PACKAGE_luci-app-sqm=y \
+            CONFIG_PACKAGE_luci-app-ttyd=y \
             CONFIG_PACKAGE_luci-app-watchcat=y \
             CONFIG_PACKAGE_luci-app-wifi7=y \
             CONFIG_PACKAGE_luci-ssl-openssl=y \
             CONFIG_PACKAGE_openssh-sftp-server=y \
+            CONFIG_PACKAGE_owut=y \
             CONFIG_PACKAGE_sqm-scripts=y \
             CONFIG_PACKAGE_tc-full=y \
+            CONFIG_PACKAGE_ttyd=y \
             CONFIG_PACKAGE_u-boot-an7581_gemtek_w1700k=y \
             CONFIG_PACKAGE_watchcat=y \
             CONFIG_PACKAGE_w1700k-hw21-bouygues-support=y \
@@ -434,21 +492,11 @@ jobs:
           }
           forbidden_found=0
           for forbidden_option in \
-            CONFIG_ALL_KMODS \
             CONFIG_PACKAGE_apk-mbedtls \
-            CONFIG_PACKAGE_attendedsysupgrade-common \
-            CONFIG_PACKAGE_ca-certificates \
             CONFIG_PACKAGE_fastfetch \
-            CONFIG_PACKAGE_librespeed-go \
             CONFIG_PACKAGE_libustream-mbedtls \
-            CONFIG_PACKAGE_luci-app-attendedsysupgrade \
-            CONFIG_PACKAGE_luci-app-filemanager \
-            CONFIG_PACKAGE_luci-app-netspeedtest \
-            CONFIG_PACKAGE_luci-app-ttyd \
             CONFIG_PACKAGE_luci-proto-relay \
-            CONFIG_PACKAGE_owut \
-            CONFIG_PACKAGE_relayd \
-            CONFIG_PACKAGE_ttyd; do
+            CONFIG_PACKAGE_relayd; do
             if grep -qx "$forbidden_option=y" .config; then
               echo "::error::Forbidden build option is enabled: $forbidden_option"
               forbidden_found=1
@@ -625,12 +673,14 @@ jobs:
 
           for rel in \
             etc/apk/repositories.d/distfeeds.list \
+            etc/config/ttyd \
             etc/hotplug.d/iface/95-dnsproxy-restore \
             etc/hotplug.d/net/50-flow-offload-wifi \
             etc/hotplug.d/net/50-nf-bridge-call \
             etc/init.d/dnsproxy-restore \
             etc/init.d/w1700k-pstore \
             etc/uci-defaults/99-w1700k-hw21-bouygues-v2 \
+            etc/vermagic.txt \
             usr/local/sbin/restore-dnsproxy-after-sysupgrade \
             usr/local/sbin/w1700k-healthcheck \
             usr/local/sbin/w1700k-pstore-collect \
@@ -651,7 +701,10 @@ jobs:
             etc/init.d/dnsproxy-restore \
             etc/init.d/fan \
             etc/init.d/irqbalance \
+            etc/init.d/librespeed-go \
+            etc/init.d/netspeedtest \
             etc/init.d/npu-jitter \
+            etc/init.d/ttyd \
             etc/init.d/watchcat \
             etc/init.d/w1700k-pstore \
             etc/uci-defaults/99-w1700k-hw21-bouygues-v2 \
@@ -664,10 +717,14 @@ jobs:
             usr/bin/flock \
             usr/bin/iperf3 \
             usr/bin/jq \
+            usr/bin/librespeed-go \
+            usr/bin/owut \
+            usr/bin/ttyd \
             usr/libexec/sftp-server \
             usr/libexec/npu-jitter-daemon \
             usr/libexec/rpcd/luci.airoha_flowsense \
             usr/libexec/rpcd/luci.fan \
+            usr/libexec/rpcd/luci.netspeedtest \
             usr/libexec/tc-full \
             usr/sbin/ethtool \
             usr/sbin/irqbalance \
@@ -685,18 +742,12 @@ jobs:
             etc/fe_debug_reg.sh \
             etc/fe_reg.sh \
             etc/gsw_status.sh \
-            etc/init.d/ttyd \
             etc/md.sh \
             etc/testgpio.sh \
-            etc/vermagic.txt \
             etc/xsi_mac_dbg.sh \
             usr/bin/fastfetch \
-            usr/bin/ttyd \
             www/cgi-bin/github_check \
-            www/cgi-bin/github_fetch \
-            www/luci-static/resources/view/attendedsysupgrade \
-            www/luci-static/resources/view/filemanager \
-            www/luci-static/resources/view/ttyd; do
+            www/cgi-bin/github_fetch; do
             [ ! -e "$root/$rel" ] || {
               echo "::error::Forbidden path is present in the rootfs: $rel"
               exit 1
@@ -705,10 +756,15 @@ jobs:
           for rel in \
             usr/share/luci/menu.d/luci-app-airoha-flowsense.json \
             usr/share/luci/menu.d/luci-app-airoha-npu.json \
+            usr/share/luci/menu.d/luci-app-attendedsysupgrade.json \
+            usr/share/luci/menu.d/luci-app-filemanager.json \
             usr/share/luci/menu.d/luci-app-irqbalance.json \
             usr/share/luci/menu.d/luci-app-log-viewer.json \
             usr/share/luci/menu.d/luci-app-mlo.json \
+            usr/share/luci/menu.d/luci-app-netspeedtest.json \
+            usr/share/luci/menu.d/luci-app-package-manager.json \
             usr/share/luci/menu.d/luci-app-sqm.json \
+            usr/share/luci/menu.d/luci-app-ttyd.json \
             usr/share/luci/menu.d/luci-app-watchcat.json \
             usr/share/luci/menu.d/luci-app-wifi7.json \
             usr/share/rpcd/ucode/luci.log-viewer \
@@ -719,8 +775,42 @@ jobs:
             }
           done
 
-          ! grep -q "/kmods/" "$root/etc/apk/repositories.d/distfeeds.list" || {
-            echo "::error::The assembled rootfs exposes a generic kmods feed"
+          expected_kmods="https://downloads.openwrt.org/snapshots/targets/airoha/an7581/kmods/6.18.39-1-7a95fc2977560f4c28e39a71bf89c960/packages.adb"
+          [ "$(grep -Fxc "$expected_kmods" "$root/etc/apk/repositories.d/distfeeds.list")" -eq 1 ] || {
+            echo "::error::The assembled rootfs lacks the exact pinned kmods feed"
+            exit 1
+          }
+          [ "$(cat "$root/etc/vermagic.txt")" = "7a95fc2977560f4c28e39a71bf89c960" ] || {
+            echo "::error::The assembled rootfs has an unexpected forced vermagic"
+            exit 1
+          }
+          grep -Eq "^[[:space:]]*option interface .@lan.$" "$root/etc/config/ttyd" || {
+            echo "::error::ttyd is not restricted to the LAN interface"
+            exit 1
+          }
+          grep -Eq "^[[:space:]]*option command ./bin/login.$" "$root/etc/config/ttyd" || {
+            echo "::error::ttyd does not require the normal login command"
+            exit 1
+          }
+          grep -Eq "^[[:space:]]*option ssl .1.$" "$root/etc/config/ttyd" || {
+            echo "::error::ttyd TLS is not enabled"
+            exit 1
+          }
+          grep -Eq "^[[:space:]]*option ssl_cert ./etc/uhttpd\\.crt.$" "$root/etc/config/ttyd" || {
+            echo "::error::ttyd does not reuse the LuCI certificate"
+            exit 1
+          }
+          grep -Eq "^[[:space:]]*option ssl_key ./etc/uhttpd\\.key.$" "$root/etc/config/ttyd" || {
+            echo "::error::ttyd does not reuse the LuCI private key"
+            exit 1
+          }
+          grep -Fq "https://www.nperf.com/fr/" \
+            "$root/www/luci-static/resources/view/netspeedtest/webspeedtest.js" || {
+            echo "::error::The assembled rootfs lacks the browser-side nPerf client"
+            exit 1
+          }
+          grep -Eq "^[[:space:]]*option enabled .0.$" "$root/etc/config/librespeed-go" || {
+            echo "::error::LibreSpeed must remain disabled by default"
             exit 1
           }
           grep -Fq "meta l4proto { tcp, udp } flow offload @ft;" \
@@ -917,10 +1007,13 @@ jobs:
               airoha-en7581-mt7996-npu-firmware \
               apk-openssl \
               arp-scan \
+              attendedsysupgrade-common \
               ca-bundle \
+              ca-certificates \
               curl \
               dnsmasq-full \
               dnsproxy \
+              dropbear \
               ethtool-full \
               firewall4 \
               fping \
@@ -944,15 +1037,20 @@ jobs:
               kmod-sched-core \
               kmod-wireguard \
               libcurl4 \
+              librespeed-go \
               libopenssl-legacy \
               luci-app-airoha-flowsense \
               luci-app-airoha-npu \
+              luci-app-attendedsysupgrade \
+              luci-app-filemanager \
               luci-app-firewall \
               luci-app-irqbalance \
               luci-app-log-viewer \
               luci-app-mlo \
+              luci-app-netspeedtest \
               luci-app-package-manager \
               luci-app-sqm \
+              luci-app-ttyd \
               luci-app-watchcat \
               luci-app-w1700k-fancontrol \
               luci-app-wifi7 \
@@ -965,10 +1063,12 @@ jobs:
               odhcpd-ipv6only \
               openssl-util \
               openssh-sftp-server \
+              owut \
               rtl826x-firmware \
               sqm-scripts \
               tc-full \
               tcpdump \
+              ttyd \
               watchcat \
               wifi-scripts \
               wireguard-tools \
@@ -985,24 +1085,15 @@ jobs:
           }
           for package in \
             apk-mbedtls \
-            attendedsysupgrade-common \
             bridger \
-            ca-certificates \
             dnsmasq \
             fastfetch \
             libmbedtls21 \
-            librespeed-go \
             libustream-mbedtls \
-            luci-app-attendedsysupgrade \
-            luci-app-filemanager \
-            luci-app-netspeedtest \
-            luci-app-ttyd \
             luci-ssl \
             luci-proto-relay \
-            owut \
             px5g-mbedtls \
-            relayd \
-            ttyd; do
+            relayd; do
             if grep -q "^$package - " "$manifest"; then
               echo "::error::Forbidden package is present in $manifest: $package"
               exit 1
@@ -1049,7 +1140,7 @@ jobs:
             echo "::error::Unexpected FlowSense version in $manifest"
             exit 1
           }
-          grep -q '^w1700k-hw21-bouygues-support - 2\.2\.0-r1$' "$manifest" || {
+          grep -q '^w1700k-hw21-bouygues-support - 2\.3\.0-r1$' "$manifest" || {
             echo "::error::Unexpected profile support package version in $manifest"
             exit 1
           }

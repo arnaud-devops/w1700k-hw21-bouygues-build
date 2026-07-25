@@ -1,0 +1,164 @@
+#!/bin/sh
+# Copyright (C) 2023-2026 Anya Lin
+
+. /lib/functions.sh
+. /usr/share/libubox/jshn.sh
+
+# uci
+CONFIG_NAME='netspeedtest'
+NAMEDDSECTION='config'
+
+# netspeedtest
+OOKLA_SPEEDTEST='/usr/libexec/netspeedtest/speedtest'
+SPEEDTEST_RESULT='/var/speedtest_result'
+
+# api
+speedTestServersUrl="https://www.speedtest.net/api/js/servers"
+speedTestServersAlternativeUrl="https://www.speedtest.net/speedtest-servers-static.php"
+speedTestServersAndroid="https://www.speedtest.net/api/android/config.php"
+speedTestServersIOS="https://www.speedtest.net/api/ios-config.php"
+
+ookla_verify() {
+	[ -x "$OOKLA_SPEEDTEST" ]
+	return $?
+}
+
+# func [args...]
+speedtest() {
+	echo "Testing" > "$SPEEDTEST_RESULT"
+	result=$("$OOKLA_SPEEDTEST" --accept-gdpr --accept-license --progress=no "$@" | grep 'Result URL' | awk '{print $NF}')
+	[ -n "$result" ] && echo "$result" > "$SPEEDTEST_RESULT" || echo "Test failed" > "$SPEEDTEST_RESULT"
+}
+
+set_proxy() {
+	[ "$(uci -q get "$CONFIG_NAME.$NAMEDDSECTION.proxy_enabled")" = "1" ] ||
+		return 0
+
+	proxy_protocol="$(uci -q get "$CONFIG_NAME.$NAMEDDSECTION.proxy_protocol")"
+	proxy_server="$(uci -q get "$CONFIG_NAME.$NAMEDDSECTION.proxy_server")"
+	[ -n "$proxy_protocol" ] && [ -n "$proxy_server" ] || return 1
+
+	ALL_PROXY="${proxy_protocol}://${proxy_server}"
+	export ALL_PROXY
+}
+
+case "$1" in
+	list)
+		json_init
+
+		json_add_object "download_ookla"
+		json_add_string "arch"
+		json_close_object
+
+		json_add_object "ookla_verify"
+		json_close_object
+
+		json_add_object "speedtest"
+		json_close_object
+
+		json_dump
+		;;
+	call)
+		case "$2" in
+			download_ookla)
+				read -t 1 -r input
+				ARCH=$(echo "$input" | jsonfilter -qe '@.arch')
+
+				if [ -z "$ARCH" ]; then
+					json_init
+					json_add_boolean "result" 0
+					json_add_string "error" 'illegal arch'
+					json_dump
+					exit
+				fi
+
+				set_proxy
+
+				UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 		Safari/537.36'
+
+				url=$( \
+					curl --connect-timeout 10 --retry 3 -sSL 'https://www.speedtest.net/apps/cli' \
+					--user-agent "$UA" \
+					| grep "Download for Linux" \
+					| sed 's|<|\n<|g' \
+					| sed -n '/Download for Linux/,/<\/div>/p' \
+					| sed -En "s|.*<a href=\"([^\"]+)\">${ARCH}|\1|p" \
+				)
+				if [ -z "$url" ]; then
+					json_init
+					json_add_boolean "result" 0
+					json_add_string "error" 'invalid architecture'
+					json_dump
+					exit
+				fi
+
+				tmp_archive="$(mktemp /tmp/netspeedtest.XXXXXX)" || exit 1
+				tmp_binary="${tmp_archive}.bin"
+				trap 'rm -f "$tmp_archive" "$tmp_binary"' EXIT HUP INT TERM
+				if ! curl --fail --proto '=https' --tlsv1.2 -sSL \
+					--url "$url" --user-agent "$UA" --output "$tmp_archive" ||
+					! tar -xz -O -f "$tmp_archive" speedtest > "$tmp_binary"; then
+					rm -f "$tmp_archive" "$tmp_binary"
+					trap - EXIT HUP INT TERM
+					json_init
+					json_add_boolean "result" 0
+					json_add_string "error" 'download or extraction failed'
+					json_dump
+					exit
+				fi
+				mkdir -p "${OOKLA_SPEEDTEST%/*}" 2>/dev/null
+				cp -f "$tmp_binary" "$OOKLA_SPEEDTEST"
+				chmod 755 "$OOKLA_SPEEDTEST"
+				rm -f "$tmp_archive" "$tmp_binary"
+				trap - EXIT HUP INT TERM
+				if ookla_verify; then
+					json_init
+					json_add_boolean "result" 1
+					json_dump
+					exit
+				else
+					rm -f "$OOKLA_SPEEDTEST"
+					json_init
+					json_add_boolean "result" 0
+					json_add_string "error" 'invalid executable file'
+					json_dump
+					exit
+				fi
+				;;
+			ookla_verify)
+				verify_result=0
+				ookla_verify && verify_result=1
+				json_init
+				json_add_boolean "result" "$verify_result"
+				json_dump
+				;;
+			speedtest)
+				if pgrep -f "$OOKLA_SPEEDTEST" >/dev/null; then
+					json_init
+					json_add_boolean "result" 0
+					json_add_string "error" 'Speedtest is underway'
+					json_dump
+					exit
+				fi
+
+				set_proxy
+
+				serverList="$(curl --connect-timeout 10 --retry 3 -sSL "$speedTestServersUrl")"
+				if [ -z "$serverList" ]; then
+					echo "No available servers" > "$SPEEDTEST_RESULT"
+					json_init
+					json_add_boolean "result" 0
+					json_add_string "error" 'No available servers'
+					json_dump
+					exit
+				fi
+
+				server_id="$(echo "$serverList" | jsonfilter -e '@[0].id')"
+				speedtest --server-id="$server_id" &
+				json_init
+				json_add_boolean "result" 1
+				json_dump
+				;;
+		esac
+		;;
+esac

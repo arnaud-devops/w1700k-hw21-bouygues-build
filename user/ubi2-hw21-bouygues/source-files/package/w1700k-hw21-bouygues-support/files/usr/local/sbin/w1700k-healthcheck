@@ -29,7 +29,7 @@ check_command() {
 	fi
 }
 
-printf 'W1700K HW2.1 Bouygues v2.2 health check\n'
+printf 'W1700K HW2.1 Bouygues v2.3 health check\n'
 # shellcheck disable=SC1091
 printf 'release=%s kernel=%s\n' \
 	"$(. /etc/openwrt_release 2>/dev/null; printf '%s' "${DISTRIB_REVISION:-unknown}")" \
@@ -53,6 +53,19 @@ if grep -Fq '965-net-airoha-disable-hw-offload-for-ipv6-vlan-uplink-only.patch' 
 	fail 'fallback patch 965 is present in build provenance'
 else
 	pass 'fallback patch 965 is absent'
+fi
+
+expected_vermagic='7a95fc2977560f4c28e39a71bf89c960'
+expected_kmods="kmods/6.18.39-1-$expected_vermagic/packages.adb"
+if [ "$(cat /etc/vermagic.txt 2>/dev/null)" = "$expected_vermagic" ]; then
+	pass 'pinned Fanboy-style buildbot vermagic active'
+else
+	fail 'pinned buildbot vermagic missing or unexpected'
+fi
+if grep -Fq "$expected_kmods" /etc/apk/repositories.d/distfeeds.list 2>/dev/null; then
+	pass 'matching official kmods repository configured'
+else
+	fail 'matching official kmods repository missing'
 fi
 
 for device in wan lan2; do
@@ -133,6 +146,32 @@ else
 	warn 'irqbalance is disabled'
 fi
 check_command 'Watchcat running' /etc/init.d/watchcat status
+
+if [ "$(uci -q get ttyd.@ttyd[0].interface)" = '@lan' ] &&
+	[ "$(uci -q get ttyd.@ttyd[0].command)" = '/bin/login' ] &&
+	[ "$(uci -q get ttyd.@ttyd[0].ssl)" = 1 ] &&
+	[ "$(uci -q get ttyd.@ttyd[0].ssl_cert)" = '/etc/uhttpd.crt' ] &&
+	[ "$(uci -q get ttyd.@ttyd[0].ssl_key)" = '/etc/uhttpd.key' ]; then
+	if [ -s /etc/uhttpd.crt ] && [ -s /etc/uhttpd.key ]; then
+		check_command 'LAN-bound TLS ttyd Web terminal running' /etc/init.d/ttyd status
+	else
+		fail 'ttyd TLS certificate or key is missing'
+	fi
+else
+	fail 'ttyd is not restricted to @lan with TLS and /bin/login'
+fi
+
+if [ "$(uci -q get librespeed-go.config.enabled)" = 1 ]; then
+	check_command 'LibreSpeed explicitly enabled and running' /etc/init.d/librespeed-go status
+else
+	pass 'LibreSpeed installed and disabled by default'
+fi
+
+if command -v owut >/dev/null 2>&1; then
+	pass 'owut installed; guarded workspace sysupgrade remains recommended'
+else
+	fail 'owut is missing'
+fi
 
 jitter_enabled="$(uci -q get npu-monitor.jitter.enabled ||
 	uci -q get npu-monitor.@jitter[0].enabled)"

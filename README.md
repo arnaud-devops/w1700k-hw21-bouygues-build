@@ -1,4 +1,4 @@
-# W1700K HW2.1 Bouygues custom v2.2
+# W1700K HW2.1 Bouygues custom v2.3
 
 This repository builds a pinned OpenWrt image for the Gemtek W1700K HW2.1
 used on a Bouygues/B&You routed connection:
@@ -9,16 +9,19 @@ used on a Bouygues/B&You routed connection:
 - WAN: DHCP on VLAN 100
 - IPv6: routed DHCPv6-PD `/60`, without NAT6
 
-The v2.2 source profile is based on Gilly's 21.07 universal build. It is
+The v2.3 source profile is based on Gilly's 21.07 universal build. It is
 compiled from source; the binary image from Gilly is not repackaged.
 
 ## Status
 
-The v2.2 candidate was built, published and independently audited offline on
-2026-07-25. It moves to Linux 6.18.39, replaces the superseded UPDMEM patch
-`971` with Gilly's `972` and `973`, and updates FlowSense to 1.1.4 while
-retaining the v2.1 hardening. No custom image has been flashed, and the release
-remains labelled:
+The v2.3 source candidate adds Fanboy's general-purpose administration and
+post-install kernel-module policy to the audited v2.2 network base. It has not
+yet been compiled or audited as a binary. No custom image has been flashed.
+
+The previous v2.2 candidate was built, published and independently audited
+offline on 2026-07-25. It moved to Linux 6.18.39, replaced superseded UPDMEM
+patch `971` with Gilly's `972` and `973`, and updated FlowSense to 1.1.4 while
+retaining the v2.1 hardening. Its release remains labelled:
 
 ```text
 [UNTESTED ON HW2.1 - DO NOT FLASH YET]
@@ -33,6 +36,7 @@ an explicit hardware-test decision is made.
 - [GitHub Actions run 30160373412](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/30160373412)
 - [Untested v2.2 prerelease](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.25_r0%2B35485-0f256a0a7a_2d688dc)
 - [Independent v2.2 audit](AUDIT-2026-07-25-V2.2.md)
+- [v2.3 Fanboy tools and compatibility policy](V2.3-FANBOY-TOOLS-POLICY.md)
 
 ## Pinned source
 
@@ -95,6 +99,26 @@ The image adds a 64 KiB `ramoops` region at `0x86ff0000`, in the free gap before
 the first QDMA reservation. The final DTB and kernel configuration are checked
 after compilation.
 
+## Kernel module installation policy
+
+The v2.3 profile deliberately enables `CONFIG_ALL_KMODS` and Fanboy's forced
+buildbot-vermagic mechanism. The exact hash is pinned to:
+
+```text
+7a95fc2977560f4c28e39a71bf89c960
+```
+
+The matching Linux 6.18.39 release-1 Airoha kmods repository is embedded as an
+exact URL instead of downloading a moving hash during CI. This preserves build
+reproducibility while allowing APK and LuCI to offer official OpenWrt
+`kmod-*` packages.
+
+All modules preinstalled in the firmware are still compiled from the pinned
+locally patched source. A later official `kmod-*` installation is an explicitly
+accepted compatibility risk: the forced package hash does not prove ABI
+identity with the RTL8261CE, Airoha PPE, bridge or MT7996 patches. Rebuild this
+profile when a new module is operationally important.
+
 ## Included administration and tools
 
 - FlowSense 1.1.4 and Airoha NPU status panels
@@ -106,12 +130,23 @@ after compilation.
 - `irqbalance` and its LuCI panel
 - SQM/Cake and its LuCI panel, installed but disabled
 - log viewer, fan control and OpenSSH SFTP
+- Attended Sysupgrade and `owut`
+- Dropbear SSH plus LAN-bound, TLS-enabled `ttyd` Web terminal
+- LuCI file manager and LuCI APK package manager
+- browser-side nPerf, LibreSpeed backend and LuCI speed-test panel, with
+  router-hosted servers disabled at boot
 - `curl`, `jq`, BusyBox `flock`, `ip-full`, `ip-bridge`, `tc-full`, `tcpdump`,
   `iperf3`, `ethtool-full`, `arp-scan`, `fping`, WireGuard and focused
   diagnostics
 
-Attended Sysupgrade, `owut`, `bridger`, `ttyd`, the LuCI file manager and the
-router-hosted speed-test server are excluded.
+`bridger`, Fanboy's separate GitHub download CGI helpers, `relayd`, `fastfetch`
+and duplicate mbedTLS packages remain excluded.
+
+Attended Sysupgrade and `owut` do not reproduce this repository's pinned
+Gilly/Fanboy patches or support package on the public OpenWrt build service.
+They are included as explicit administrative tools, not as the recommended
+upgrade path. The checksum-verified workspace sysupgrade procedure remains the
+only supported path for preserving the complete custom policy.
 
 The optional FlowSense latency metric can be enabled explicitly with:
 
@@ -156,11 +191,12 @@ Run the `build W1700K HW2.1 Bouygues` workflow. It builds only the
 - source, feed, container and builder provenance.
 
 The workflow validates the assembled rootfs, kernel configuration, final DTB,
-driver/firmware policy, executable modes, TLS stack, recovery files and package
-manifest before creating an untested prerelease. Release assets receive GitHub
-build-provenance attestations.
+driver/firmware policy, executable modes, TLS stack, recovery files, pinned
+vermagic/kmods tuple, LAN-only ttyd policy, disabled LibreSpeed default and
+package manifest before creating an untested prerelease. Release assets receive
+GitHub build-provenance attestations.
 
-The v2.2 image is 22,463,390 bytes and has SHA-256
+The previous v2.2 image is 22,463,390 bytes and has SHA-256
 `d733f4f7aafc0aca4d31e3854f9a38b7dfa59d92150748871b11f531081b0b52`.
 The corrected v2.1 image is superseded but remains available as the previous
 offline-audited candidate. The first v2 image is also superseded; its findings
