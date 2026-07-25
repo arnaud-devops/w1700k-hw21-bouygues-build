@@ -29,16 +29,25 @@ check_command() {
 	fi
 }
 
-printf 'W1700K HW2.1 Bouygues v2.1 health check\n'
+printf 'W1700K HW2.1 Bouygues v2.2 health check\n'
 # shellcheck disable=SC1091
 printf 'release=%s kernel=%s\n' \
 	"$(. /etc/openwrt_release 2>/dev/null; printf '%s' "${DISTRIB_REVISION:-unknown}")" \
 	"$(uname -r)"
 
+for patch in \
+	'972-net-airoha-sync-UPDMEM-source-MAC-for-offloaded-IPv6.patch' \
+	'973-net-airoha-UPDMEM-slot-allocator-for-IPv6-source-MACs.patch'; do
+	if grep -Fq "$patch" /build_info 2>/dev/null; then
+		pass "$patch is recorded in build provenance"
+	else
+		fail "$patch is missing from build provenance"
+	fi
+done
 if grep -Fq '971-net-airoha-sync-UPDMEM-source-MAC-for-offloaded-IPv6.patch' /build_info 2>/dev/null; then
-	pass 'patch 971 is recorded in build provenance'
+	fail 'superseded patch 971 is present in build provenance'
 else
-	fail 'patch 971 is missing from build provenance'
+	pass 'superseded patch 971 is absent'
 fi
 if grep -Fq '965-net-airoha-disable-hw-offload-for-ipv6-vlan-uplink-only.patch' /build_info 2>/dev/null; then
 	fail 'fallback patch 965 is present in build provenance'
@@ -125,7 +134,9 @@ else
 fi
 check_command 'Watchcat running' /etc/init.d/watchcat status
 
-if [ "$(uci -q get npu-monitor.jitter.enabled)" = 1 ]; then
+jitter_enabled="$(uci -q get npu-monitor.jitter.enabled ||
+	uci -q get npu-monitor.@jitter[0].enabled)"
+if [ "$jitter_enabled" = 1 ]; then
 	check_command 'FlowSense jitter probe enabled and running' /etc/init.d/npu-jitter status
 else
 	pass 'FlowSense jitter probe disabled by default policy'

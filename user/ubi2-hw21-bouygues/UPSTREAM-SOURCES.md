@@ -1,14 +1,14 @@
-# Custom v2 upstream source map
+# Custom v2.2 upstream source map
 
-This profile is a source build based on the Gilly 19.07 universal image. It
+This profile is a source build based on the Gilly 21.07 universal image. It
 does not modify or repack Gilly's binary firmware.
 
 ## Immutable references
 
 | Component | Repository | Commit |
 | --- | --- | --- |
-| OpenWrt base | `openwrt/openwrt` | `4f2dc5cc6497a6cef0a43bdefde522e734c1f40d` |
-| HW2.1/kernel/Wi-Fi patchset | `Gilly1970/Gemtek-W1700K-6.18` | `b27c4e2a1134445db256db3417c9f784f84d6c42` |
+| OpenWrt base | `openwrt/openwrt` | `0f256a0a7adf5741e4a061f59a08cd01c14dc526` |
+| HW2.1/kernel/Wi-Fi patchset | `Gilly1970/Gemtek-W1700K-6.18` | `e6a4cdcbb05a486dba8871466baa014dd5d97a95` |
 | NPU/MLO/Wi-Fi 7 LuCI applications | `OpenWRT-fanboy/OpenW1700k` | `acbf82b77b96da9b62890db1e0bf82d322602ac0` |
 | Log viewer | `gSpotx2f/luci-app-log` | `69226866b51f90c35390dfe57875d56d337d8b56` |
 
@@ -20,15 +20,17 @@ Every entry selected by Gilly's `openwrt-patches/openwrt-add-patch` at the
 pinned commit is copied to the same OpenWrt destination. This includes:
 
 - RTL8261CE driver and its CE-vs-N PMA model discrimination;
-- patch `971` for IPv6 UPDMEM source-MAC synchronization;
+- patch `972` for IPv6 UPDMEM source-MAC synchronization;
+- patch `973` for refcounted per-MAC UPDMEM slot allocation and locking;
 - mt7996 radar attribution, EHT, tx-power and hardening patches;
 - NPU firmware and Airoha/QDMA/thermal fixes;
 - Gilly's existing `675-*` nft flowtable bridge path and related Wi-Fi
   flowtable discovery hooks;
 - CPU frequency support, VLAN fixes and universal UBI2 device definition.
 
-Patch `965` is absent from Gilly's pinned 19.07 selection and is forbidden by
-the builder. PR 24038 and the `bridger` package are not imported.
+Superseded patch `971` and selective fallback patch `965` are absent from
+Gilly's pinned 21.07 selection and are forbidden by the builder. PR 24038 and
+the `bridger` package are not imported.
 
 ## Intentional local source changes
 
@@ -64,8 +66,9 @@ Seven Gilly-provided source files differ by content:
 
    Make the permanent two-second external jitter probe opt-in. The service
    remains installed for FlowSense but starts its daemon only when
-   `npu-monitor.jitter.enabled=1`. The FlowSense package release is bumped to
-   carry these changes.
+   `npu-monitor.jitter.enabled=1`. Named and legacy anonymous UCI sections are
+   supported, while FlowSense 1.1.4's atomic writes and real mt76 per-band Tx
+   PER metric are retained.
 
 The custom LuCI applications and `w1700k-hw21-bouygues-support` package are
 additional package directories; they do not edit the Gilly driver patches.
@@ -81,9 +84,9 @@ additional package directories; they do not edit the Gilly driver patches.
 - upstream and builder commits: embedded in `/build_info`
 
 The workflow compares these locks before `make defconfig`, rejects missing
-`971` or present `965`, and checks the final kernel config and DTB after the
-build. The UBI2 profile explicitly selects the W1700K U-Boot package and the
-workflow verifies its compressed image and DTB before image generation; this
-avoids relying on a chainloader file inherited from a build cache. The cache
-seed is a best-effort performance optimization and is not a source of files
-included in the firmware.
+`972`/`973`, rejects superseded `971` or fallback `965`, and checks the final
+kernel config and DTB after the build. The UBI2 profile explicitly selects the
+W1700K U-Boot package and the workflow verifies its compressed image and DTB
+before image generation; this avoids relying on a chainloader file inherited
+from a build cache. The cache seed is a best-effort performance optimization
+and is not a source of files included in the firmware.

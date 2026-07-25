@@ -17,12 +17,20 @@ rm -f \
 	files/www/cgi-bin/github_fetch
 
 patch_dir=target/linux/airoha/patches-6.18
-patch_971="$patch_dir/971-net-airoha-sync-UPDMEM-source-MAC-for-offloaded-IPv6.patch"
+patch_972="$patch_dir/972-net-airoha-sync-UPDMEM-source-MAC-for-offloaded-IPv6.patch"
+patch_973="$patch_dir/973-net-airoha-UPDMEM-slot-allocator-for-IPv6-source-MACs.patch"
 
-[ -s "$patch_971" ] || {
-	echo "missing required IPv6 UPDMEM patch 971" >&2
+for patch in "$patch_972" "$patch_973"; do
+	[ -s "$patch" ] || {
+		echo "missing required IPv6 UPDMEM patch: $patch" >&2
+		exit 1
+	}
+done
+
+if find "$patch_dir" -type f -name '971-*UPDMEM*' | grep -q .; then
+	echo "superseded IPv6 UPDMEM patch 971 is present" >&2
 	exit 1
-}
+fi
 
 if find target/linux -type f -name '*965*ipv6*vlan*' | grep -q .; then
 	echo "forbidden selective fallback patch 965 is present" >&2
@@ -50,7 +58,7 @@ grep -Eq "^[[:space:]]*option enabled .0.$" package/luci-app-airoha-flowsense/ro
 	echo "FlowSense jitter probe is not disabled by default" >&2
 	exit 1
 }
-grep -Fq 'config_get_bool enabled jitter enabled 0' \
+grep -Fq 'npu-monitor.jitter.enabled' \
 	package/luci-app-airoha-flowsense/root/etc/init.d/npu-jitter || {
 	echo "FlowSense jitter service does not enforce its opt-in policy" >&2
 	exit 1

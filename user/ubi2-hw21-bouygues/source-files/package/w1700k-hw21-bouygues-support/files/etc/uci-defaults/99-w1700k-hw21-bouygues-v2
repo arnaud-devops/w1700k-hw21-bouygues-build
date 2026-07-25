@@ -31,7 +31,7 @@ append_sysupgrade_path /etc/init.d/dnsproxy-restore
 append_sysupgrade_path /etc/hotplug.d/iface/95-dnsproxy-restore
 append_sysupgrade_path /etc/rc.d/S99dnsproxy-restore
 
-# Root-cause patch 971 restores the stock dual-stack fw4 rule. Stop
+# Root-cause patches 972 and 973 restore the stock dual-stack fw4 rule. Stop
 # carrying a package-owned template into later, potentially incompatible fw4
 # versions once that stock rule is present.
 fw4_template=/usr/share/firewall4/templates/ruleset.uc

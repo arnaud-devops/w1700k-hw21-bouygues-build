@@ -1,4 +1,4 @@
-# W1700K HW2.1 Bouygues custom v2
+# W1700K HW2.1 Bouygues custom v2.2
 
 This repository builds a pinned OpenWrt image for the Gemtek W1700K HW2.1
 used on a Bouygues/B&You routed connection:
@@ -9,16 +9,17 @@ used on a Bouygues/B&You routed connection:
 - WAN: DHCP on VLAN 100
 - IPv6: routed DHCPv6-PD `/60`, without NAT6
 
-The v2 artifact is based on Gilly's 19.07 universal build. It is compiled from
-source; the binary image from Gilly is not repackaged.
+The v2.2 source profile is based on Gilly's 21.07 universal build. It is
+compiled from source; the binary image from Gilly is not repackaged.
 
 ## Status
 
-The corrected v2.1 candidate was built, published and independently audited
-offline on 2026-07-20. It fixes both second-pass v2 findings, makes the
-FlowSense jitter probe opt-in, and builds the W1700K chainloader dependency
-without relying on an inherited cache. The image has not been flashed and
-remains labelled:
+The v2.2 source update was prepared on 2026-07-25. It moves to Linux 6.18.39,
+replaces the superseded UPDMEM patch `971` with Gilly's `972` and `973`, and
+updates FlowSense to 1.1.4 while retaining the v2.1 hardening. Until its build
+and independent offline audit complete, v2.1 remains the last published
+candidate. No custom image has been flashed, and every release remains
+labelled:
 
 ```text
 [UNTESTED ON HW2.1 - DO NOT FLASH YET]
@@ -36,13 +37,13 @@ an explicit hardware-test decision is made.
 
 ## Pinned source
 
-- OpenWrt: `4f2dc5cc6497a6cef0a43bdefde522e734c1f40d`
+- OpenWrt: `0f256a0a7adf5741e4a061f59a08cd01c14dc526`
 - Gilly patch repository:
-  `b27c4e2a1134445db256db3417c9f784f84d6c42`
+  `e6a4cdcbb05a486dba8871466baa014dd5d97a95`
 - Fanboy LuCI applications:
   `acbf82b77b96da9b62890db1e0bf82d322602ac0`
 - log viewer: `69226866b51f90c35390dfe57875d56d337d8b56`
-- Linux: `6.18.38`
+- Linux: `6.18.39`
 
 All five OpenWrt feeds are pinned in
 [`feeds.lock`](user/ubi2-hw21-bouygues/feeds.lock). The source overlay,
@@ -55,8 +56,11 @@ in [`UPSTREAM-SOURCES.md`](user/ubi2-hw21-bouygues/UPSTREAM-SOURCES.md).
 
 The production patch policy is deliberate:
 
-- patch `971` is present and synchronizes the IPv6 PPE source-MAC entry in
-  UPDMEM with the actual offloaded flow;
+- patch `972` synchronizes the IPv6 PPE source-MAC entry in UPDMEM with the
+  actual offloaded flow;
+- patch `973` allocates, references and locks UPDMEM slots per source MAC,
+  falling back only an individual flow if no safe slot is available;
+- superseded patch `971` is absent;
 - fallback patch `965` is absent, so it cannot reject IPv6 VLAN uplink flows
   before the root-cause fix runs;
 - the normal dual-stack fw4 flow rule remains active;
@@ -64,20 +68,20 @@ The production patch policy is deliberate:
 - VLAN and PPPoE offload are not enabled by this profile;
 - PR 24038 and `bridger` are not included.
 
-The Gilly 19.07 `675-*` nft flowtable bridge series is retained. It is part of
+The Gilly 21.07 `675-*` nft flowtable bridge series is retained. It is part of
 the already tested Gilly data path used to discover Wi-Fi/bridge egress ports;
 it is not PR 24038. Removing it would make this first v2 candidate diverge from
 the known working base before hardware validation.
 
-The workflow fails if patch `971` is missing or a `965` IPv6/VLAN fallback is
-found in the applied source tree.
+The workflow fails if `972` or `973` is missing, or if superseded `971` or a
+`965` IPv6/VLAN fallback is found in the applied source tree.
 
 ## Hardware and Wi-Fi
 
-The image keeps Gilly 19.07's:
+The image keeps Gilly 21.07's:
 
 - RTL8261CE PMA model check, allowing CE model `0x9` and RTL8261N model `0x2f`
-  to be distinguished in a universal source tree; v2.1 also preserves
+  to be distinguished in a universal source tree; v2.2 also preserves
   phylib's generic Realtek vendor/model guard;
 - NPU and MT7996 firmware;
 - mt7996 radar `chanctx` attribution fix;
@@ -94,7 +98,7 @@ after compilation.
 
 ## Included administration and tools
 
-- FlowSense and Airoha NPU status panels
+- FlowSense 1.1.4 and Airoha NPU status panels
 - FlowSense jitter probe installed but disabled by default
 - MLO and Wi-Fi 7 panels
 - full OpenSSL-backed LuCI HTTPS stack
@@ -157,7 +161,8 @@ driver/firmware policy, executable modes, TLS stack, recovery files and package
 manifest before creating an untested prerelease. Release assets receive GitHub
 build-provenance attestations.
 
-The corrected v2.1 image is 22,459,294 bytes and has SHA-256
+The corrected v2.1 image remains the previous audited candidate. It is
+22,459,294 bytes and has SHA-256
 `c7e4cdb2da68423d5c3906f412fdf50792a96b7a823c36b7152febd2fa252d3d`.
 The first v2 image is superseded; its audit and findings remain in
 [`AUDIT-2026-07-20.md`](AUDIT-2026-07-20.md).
