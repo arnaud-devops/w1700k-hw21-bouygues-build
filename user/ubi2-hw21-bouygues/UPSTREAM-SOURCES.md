@@ -83,8 +83,11 @@ from the pinned application commit. Its declared dependencies select `iperf3`,
 - restricts RPC methods that download or execute speed tests to LuCI write
   permission, leaving only status verification in the read ACL;
 - validates the prepare-script arguments and path quoting;
-- quotes the Ookla RPC arguments, uses explicit proxy construction, and
-  extracts only the expected `speedtest` archive member into a temporary file.
+- restricts the optional Ookla path to this target's `aarch64` architecture
+  and the official `install.speedtest.net` URL pattern;
+- quotes the Ookla RPC arguments, uses explicit proxy construction, extracts
+  only the expected `speedtest` archive member into a temporary file, and
+  executes `--version` before installation.
 
 The optional Ookla CLI remains an explicit interactive download over HTTPS; it
 is not present in the immutable image. nPerf runs in the administrator's

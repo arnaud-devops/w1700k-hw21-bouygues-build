@@ -19,8 +19,8 @@ speedTestServersAndroid="https://www.speedtest.net/api/android/config.php"
 speedTestServersIOS="https://www.speedtest.net/api/ios-config.php"
 
 ookla_verify() {
-	[ -x "$OOKLA_SPEEDTEST" ]
-	return $?
+	[ -x "$OOKLA_SPEEDTEST" ] &&
+		"$OOKLA_SPEEDTEST" --version >/dev/null 2>&1
 }
 
 # func [args...]
@@ -64,10 +64,10 @@ case "$1" in
 				read -t 1 -r input
 				ARCH=$(echo "$input" | jsonfilter -qe '@.arch')
 
-				if [ -z "$ARCH" ]; then
+				if [ "$ARCH" != "aarch64" ]; then
 					json_init
 					json_add_boolean "result" 0
-					json_add_string "error" 'illegal arch'
+					json_add_string "error" 'unsupported architecture'
 					json_dump
 					exit
 				fi
@@ -84,13 +84,17 @@ case "$1" in
 					| sed -n '/Download for Linux/,/<\/div>/p' \
 					| sed -En "s|.*<a href=\"([^\"]+)\">${ARCH}|\1|p" \
 				)
-				if [ -z "$url" ]; then
+				case "$url" in
+				https://install.speedtest.net/app/cli/ookla-speedtest-*-linux-aarch64.tgz)
+					;;
+				*)
 					json_init
 					json_add_boolean "result" 0
-					json_add_string "error" 'invalid architecture'
+					json_add_string "error" 'invalid download URL'
 					json_dump
 					exit
-				fi
+					;;
+				esac
 
 				tmp_archive="$(mktemp /tmp/netspeedtest.XXXXXX)" || exit 1
 				tmp_binary="${tmp_archive}.bin"
@@ -103,6 +107,16 @@ case "$1" in
 					json_init
 					json_add_boolean "result" 0
 					json_add_string "error" 'download or extraction failed'
+					json_dump
+					exit
+				fi
+				chmod 755 "$tmp_binary"
+				if ! "$tmp_binary" --version >/dev/null 2>&1; then
+					rm -f "$tmp_archive" "$tmp_binary"
+					trap - EXIT HUP INT TERM
+					json_init
+					json_add_boolean "result" 0
+					json_add_string "error" 'downloaded executable validation failed'
 					json_dump
 					exit
 				fi

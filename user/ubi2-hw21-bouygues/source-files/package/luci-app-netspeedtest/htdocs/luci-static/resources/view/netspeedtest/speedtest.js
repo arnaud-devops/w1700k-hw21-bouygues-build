@@ -165,12 +165,8 @@ return view.extend({
 		o.depends('proxy_enabled', '1');
 
 		o = s.option(form.ListValue, '_arch', _('System Arch'));
-		o.value('i386');
-		o.value('x86_64');
-		o.value('armel');
-		o.value('armhf');
 		o.value('aarch64');
-		o.default = 'x86_64';
+		o.default = 'aarch64';
 		o.write = function() {};
 
 		o = s.option(form.Button, '_download', _('Download Ookla® SpeedTest-CLI'));

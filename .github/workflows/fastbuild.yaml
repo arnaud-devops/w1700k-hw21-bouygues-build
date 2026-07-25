@@ -389,6 +389,25 @@ jobs:
             echo "::error::Net Speedtest side-effecting RPC methods are not write-restricted"
             exit 1
           }
+          netspeed_rpc=package/luci-app-netspeedtest/root/usr/libexec/rpcd/luci.netspeedtest
+          netspeed_native_view=package/luci-app-netspeedtest/htdocs/luci-static/resources/view/netspeedtest/speedtest.js
+          for native_policy in \
+            "unsupported architecture" \
+            "https://install.speedtest.net/app/cli/ookla-speedtest-" \
+            "--version"; do
+            grep -Fq -- "$native_policy" "$netspeed_rpc" || {
+              echo "::error::The optional Ookla path lacks policy: $native_policy"
+              exit 1
+            }
+          done
+          grep -Fq "aarch64" "$netspeed_native_view" || {
+            echo "::error::The Ookla LuCI selector does not target aarch64"
+            exit 1
+          }
+          if grep -Eq "i386|x86_64|armel|armhf" "$netspeed_native_view"; then
+            echo "::error::The target-specific Ookla selector exposes another architecture"
+            exit 1
+          fi
           cmp "$bp/files/etc/vermagic.txt" \
             package/w1700k-hw21-bouygues-support/files/etc/vermagic.txt || {
             echo "::error::The build and runtime vermagic files differ"
@@ -824,6 +843,25 @@ jobs:
             echo "::error::The assembled Net Speedtest RPC ACL is not write-restricted"
             exit 1
           }
+          netspeed_rpc="$root/usr/libexec/rpcd/luci.netspeedtest"
+          netspeed_native_view="$root/www/luci-static/resources/view/netspeedtest/speedtest.js"
+          for native_policy in \
+            "unsupported architecture" \
+            "https://install.speedtest.net/app/cli/ookla-speedtest-" \
+            "--version"; do
+            grep -Fq -- "$native_policy" "$netspeed_rpc" || {
+              echo "::error::The assembled Ookla path lacks policy: $native_policy"
+              exit 1
+            }
+          done
+          grep -Fq "aarch64" "$netspeed_native_view" || {
+            echo "::error::The assembled Ookla LuCI selector does not target aarch64"
+            exit 1
+          }
+          if grep -Eq "i386|x86_64|armel|armhf" "$netspeed_native_view"; then
+            echo "::error::The assembled target-specific Ookla selector exposes another architecture"
+            exit 1
+          fi
           grep -Eq "^[[:space:]]*option enabled .0.$" "$root/etc/config/librespeed-go" || {
             echo "::error::LibreSpeed must remain disabled by default"
             exit 1
