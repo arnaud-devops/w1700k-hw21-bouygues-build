@@ -14,12 +14,11 @@ compiled from source; the binary image from Gilly is not repackaged.
 
 ## Status
 
-The v2.2 source update was prepared on 2026-07-25. It moves to Linux 6.18.39,
-replaces the superseded UPDMEM patch `971` with Gilly's `972` and `973`, and
-updates FlowSense to 1.1.4 while retaining the v2.1 hardening. Until its build
-and independent offline audit complete, v2.1 remains the last published
-candidate. No custom image has been flashed, and every release remains
-labelled:
+The v2.2 candidate was built, published and independently audited offline on
+2026-07-25. It moves to Linux 6.18.39, replaces the superseded UPDMEM patch
+`971` with Gilly's `972` and `973`, and updates FlowSense to 1.1.4 while
+retaining the v2.1 hardening. No custom image has been flashed, and the release
+remains labelled:
 
 ```text
 [UNTESTED ON HW2.1 - DO NOT FLASH YET]
@@ -31,9 +30,9 @@ No workflow in this repository connects to the router.
 The active router remains on the separately validated Gilly 17.07 image until
 an explicit hardware-test decision is made.
 
-- [GitHub Actions run 29771406982](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/29771406982)
-- [Untested v2.1 prerelease](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.20_r0%2B35431-4f2dc5cc64_f5b2b5d)
-- [Independent v2.1 audit](AUDIT-2026-07-20-V2.1.md)
+- [GitHub Actions run 30160373412](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/30160373412)
+- [Untested v2.2 prerelease](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.25_r0%2B35485-0f256a0a7a_2d688dc)
+- [Independent v2.2 audit](AUDIT-2026-07-25-V2.2.md)
 
 ## Pinned source
 
@@ -161,11 +160,11 @@ driver/firmware policy, executable modes, TLS stack, recovery files and package
 manifest before creating an untested prerelease. Release assets receive GitHub
 build-provenance attestations.
 
-The corrected v2.1 image remains the previous audited candidate. It is
-22,459,294 bytes and has SHA-256
-`c7e4cdb2da68423d5c3906f412fdf50792a96b7a823c36b7152febd2fa252d3d`.
-The first v2 image is superseded; its audit and findings remain in
-[`AUDIT-2026-07-20.md`](AUDIT-2026-07-20.md).
+The v2.2 image is 22,463,390 bytes and has SHA-256
+`d733f4f7aafc0aca4d31e3854f9a38b7dfa59d92150748871b11f531081b0b52`.
+The corrected v2.1 image is superseded but remains available as the previous
+offline-audited candidate. The first v2 image is also superseded; its findings
+remain in [`AUDIT-2026-07-20.md`](AUDIT-2026-07-20.md).
 
 ## Hardware gate
 
