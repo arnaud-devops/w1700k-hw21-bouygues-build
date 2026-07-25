@@ -384,8 +384,8 @@ jobs:
             exit 1
           }
           netspeed_acl=package/luci-app-netspeedtest/root/usr/share/rpcd/acl.d/luci-app-netspeedtest.json
-          jq -e ".[\"luci-app-netspeedtest\"].read.ubus[\"luci.netspeedtest\"] == [\"ookla_verify\"] and (.[\"luci-app-netspeedtest\"].write.ubus[\"luci.netspeedtest\"] | sort) == [\"download_ookla\", \"speedtest\"]" \
-            "$netspeed_acl" >/dev/null || {
+          python3 -c "import json,sys; a=json.load(open(sys.argv[1], encoding=\"utf-8\"))[\"luci-app-netspeedtest\"]; sys.exit(0 if a[\"read\"][\"ubus\"][\"luci.netspeedtest\"] == [\"ookla_verify\"] and sorted(a[\"write\"][\"ubus\"][\"luci.netspeedtest\"]) == [\"download_ookla\", \"speedtest\"] else 1)" \
+            "$netspeed_acl" || {
             echo "::error::Net Speedtest side-effecting RPC methods are not write-restricted"
             exit 1
           }
@@ -838,8 +838,8 @@ jobs:
             echo "::error::The assembled rootfs lacks the browser-side nPerf client"
             exit 1
           }
-          jq -e ".[\"luci-app-netspeedtest\"].read.ubus[\"luci.netspeedtest\"] == [\"ookla_verify\"] and (.[\"luci-app-netspeedtest\"].write.ubus[\"luci.netspeedtest\"] | sort) == [\"download_ookla\", \"speedtest\"]" \
-            "$root/usr/share/rpcd/acl.d/luci-app-netspeedtest.json" >/dev/null || {
+          python3 -c "import json,sys; a=json.load(open(sys.argv[1], encoding=\"utf-8\"))[\"luci-app-netspeedtest\"]; sys.exit(0 if a[\"read\"][\"ubus\"][\"luci.netspeedtest\"] == [\"ookla_verify\"] and sorted(a[\"write\"][\"ubus\"][\"luci.netspeedtest\"]) == [\"download_ookla\", \"speedtest\"] else 1)" \
+            "$root/usr/share/rpcd/acl.d/luci-app-netspeedtest.json" || {
             echo "::error::The assembled Net Speedtest RPC ACL is not write-restricted"
             exit 1
           }
