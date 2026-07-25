@@ -77,7 +77,7 @@ b4a8b5219ac37368e341d863cd1037f9bfe8caba2eb8f643586cd5473fdbf15e  ./package/luci
 31e37c3bce5e293227fbe3451325d2e8b5c6e7b1791a7b8303286c71bc046f06  ./package/luci-app-netspeedtest/root/etc/uci-defaults/99_netspeedtest
 5d8a38beae4f25fcfe897d3438f74400cda1f266458b57988c8ff32e6323eb9a  ./package/luci-app-netspeedtest/root/usr/libexec/rpcd/luci.netspeedtest
 1cf83a1899b2429dd41bfb969276ffb8e5e03b6846df9151c2980a27c2c0a2bc  ./package/luci-app-netspeedtest/root/usr/share/luci/menu.d/luci-app-netspeedtest.json
-7e6604c1fb6abc4f3b9bf829c2154142d53d6343f1c399f26929a9b1d776c0c2  ./package/luci-app-netspeedtest/root/usr/share/rpcd/acl.d/luci-app-netspeedtest.json
+ee953427cfd2873e2a17530698cb00846228efc144ca93ec50385edaac95625b  ./package/luci-app-netspeedtest/root/usr/share/rpcd/acl.d/luci-app-netspeedtest.json
 7f0f022815d9ffe57a2b9a717d49893f77bfed052f16af179dcb99dbbb6f6ab8  ./package/luci-app-w1700k-fancontrol/LICENSE
 b8edff4b5b75654628190abe58b830ba6902e670c830d838aa292b674e2b1e4e  ./package/luci-app-w1700k-fancontrol/Makefile
 7de2060d199ba0ada3a39fbe307778afaef225326a549ce6d328ddd51ed5f3fe  ./package/luci-app-w1700k-fancontrol/README.md
