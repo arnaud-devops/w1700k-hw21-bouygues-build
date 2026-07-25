@@ -384,7 +384,7 @@ jobs:
             exit 1
           }
           netspeed_acl=package/luci-app-netspeedtest/root/usr/share/rpcd/acl.d/luci-app-netspeedtest.json
-          python3 -c "import json,sys; a=json.load(open(sys.argv[1], encoding=\"utf-8\"))[\"luci-app-netspeedtest\"]; sys.exit(0 if a[\"read\"][\"ubus\"][\"luci.netspeedtest\"] == [\"ookla_verify\"] and sorted(a[\"write\"][\"ubus\"][\"luci.netspeedtest\"]) == [\"download_ookla\", \"speedtest\"] else 1)" \
+          python3 -c "import json,sys; a=json.load(open(sys.argv[1], encoding=\"utf-8\"))[\"luci-app-netspeedtest\"]; sys.exit(0 if a[\"read\"][\"ubus\"][\"luci.netspeedtest\"] == [\"ookla_verify\"] and \"/etc/init.d/netspeedtest\" not in a[\"read\"].get(\"file\", {}) and a[\"write\"][\"file\"][\"/etc/init.d/netspeedtest\"] == [\"exec\"] and sorted(a[\"write\"][\"ubus\"][\"luci.netspeedtest\"]) == [\"download_ookla\", \"speedtest\"] else 1)" \
             "$netspeed_acl" || {
             echo "::error::Net Speedtest side-effecting RPC methods are not write-restricted"
             exit 1
@@ -394,6 +394,7 @@ jobs:
           for native_policy in \
             "unsupported architecture" \
             "https://install.speedtest.net/app/cli/ookla-speedtest-" \
+            "--proto-redir" \
             "--version"; do
             grep -Fq -- "$native_policy" "$netspeed_rpc" || {
               echo "::error::The optional Ookla path lacks policy: $native_policy"
@@ -838,7 +839,7 @@ jobs:
             echo "::error::The assembled rootfs lacks the browser-side nPerf client"
             exit 1
           }
-          python3 -c "import json,sys; a=json.load(open(sys.argv[1], encoding=\"utf-8\"))[\"luci-app-netspeedtest\"]; sys.exit(0 if a[\"read\"][\"ubus\"][\"luci.netspeedtest\"] == [\"ookla_verify\"] and sorted(a[\"write\"][\"ubus\"][\"luci.netspeedtest\"]) == [\"download_ookla\", \"speedtest\"] else 1)" \
+          python3 -c "import json,sys; a=json.load(open(sys.argv[1], encoding=\"utf-8\"))[\"luci-app-netspeedtest\"]; sys.exit(0 if a[\"read\"][\"ubus\"][\"luci.netspeedtest\"] == [\"ookla_verify\"] and \"/etc/init.d/netspeedtest\" not in a[\"read\"].get(\"file\", {}) and a[\"write\"][\"file\"][\"/etc/init.d/netspeedtest\"] == [\"exec\"] and sorted(a[\"write\"][\"ubus\"][\"luci.netspeedtest\"]) == [\"download_ookla\", \"speedtest\"] else 1)" \
             "$root/usr/share/rpcd/acl.d/luci-app-netspeedtest.json" || {
             echo "::error::The assembled Net Speedtest RPC ACL is not write-restricted"
             exit 1
@@ -848,6 +849,7 @@ jobs:
           for native_policy in \
             "unsupported architecture" \
             "https://install.speedtest.net/app/cli/ookla-speedtest-" \
+            "--proto-redir" \
             "--version"; do
             grep -Fq -- "$native_policy" "$netspeed_rpc" || {
               echo "::error::The assembled Ookla path lacks policy: $native_policy"

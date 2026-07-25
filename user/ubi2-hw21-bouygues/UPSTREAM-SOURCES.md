@@ -80,11 +80,13 @@ from the pinned application commit. Its declared dependencies select `iperf3`,
 - makes two init-script expressions POSIX-safe (`=` instead of `==`, and an
   explicit `if` instead of `A && B || C`);
 - exposes the official nPerf website in the browser-side client panel;
-- restricts RPC methods that download or execute speed tests to LuCI write
-  permission, leaving only status verification in the read ACL;
+- restricts the init-script execution and RPC methods that download or
+  execute speed tests to LuCI write permission, leaving only status
+  verification in the read ACL;
 - validates the prepare-script arguments and path quoting;
 - restricts the optional Ookla path to this target's `aarch64` architecture
-  and the official `install.speedtest.net` URL pattern;
+  and the official `install.speedtest.net` URL pattern, with HTTPS-only
+  redirects;
 - quotes the Ookla RPC arguments, uses explicit proxy construction, extracts
   only the expected `speedtest` archive member into a temporary file, and
   executes `--version` before installation.

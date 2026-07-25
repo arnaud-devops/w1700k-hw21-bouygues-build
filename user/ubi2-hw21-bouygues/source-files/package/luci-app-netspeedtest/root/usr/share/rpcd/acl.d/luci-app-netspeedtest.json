@@ -3,7 +3,6 @@
     "description": "Grant access to netspeedtest procedures",
     "read": {
       "file": {
-        "/etc/init.d/netspeedtest": [ "exec" ],
         "/var/speedtest_result": [ "read" ]
       },
       "ubus": {
@@ -13,6 +12,9 @@
       "uci": [ "netspeedtest", "librespeed-go" ]
     },
     "write": {
+      "file": {
+        "/etc/init.d/netspeedtest": [ "exec" ]
+      },
       "ubus": {
         "luci.netspeedtest": [ "download_ookla", "speedtest" ]
       },

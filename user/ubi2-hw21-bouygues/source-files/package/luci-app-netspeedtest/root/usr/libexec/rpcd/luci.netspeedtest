@@ -77,7 +77,8 @@ case "$1" in
 				UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 		Safari/537.36'
 
 				url=$( \
-					curl --connect-timeout 10 --retry 3 -sSL 'https://www.speedtest.net/apps/cli' \
+					curl --fail --proto '=https' --proto-redir '=https' --tlsv1.2 \
+					--connect-timeout 10 --retry 3 -sSL 'https://www.speedtest.net/apps/cli' \
 					--user-agent "$UA" \
 					| grep "Download for Linux" \
 					| sed 's|<|\n<|g' \
@@ -99,7 +100,7 @@ case "$1" in
 				tmp_archive="$(mktemp /tmp/netspeedtest.XXXXXX)" || exit 1
 				tmp_binary="${tmp_archive}.bin"
 				trap 'rm -f "$tmp_archive" "$tmp_binary"' EXIT HUP INT TERM
-				if ! curl --fail --proto '=https' --tlsv1.2 -sSL \
+				if ! curl --fail --proto '=https' --proto-redir '=https' --tlsv1.2 -sSL \
 					--url "$url" --user-agent "$UA" --output "$tmp_archive" ||
 					! tar -xz -O -f "$tmp_archive" speedtest > "$tmp_binary"; then
 					rm -f "$tmp_archive" "$tmp_binary"
