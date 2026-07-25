@@ -478,6 +478,10 @@ jobs:
               exit 1
             }
           done
+          grep -qx "# CONFIG_PACKAGE_kmod-ipt-rtpengine is not set" .config || {
+            echo "::error::Broken and unrelated rtpengine kmod must remain excluded from ALL_KMODS"
+            exit 1
+          }
           grep -qx "# CONFIG_PACKAGE_dnsmasq is not set" .config || {
             echo "::error::The dnsmasq-full package would conflict with dnsmasq"
             exit 1

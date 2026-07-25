@@ -119,6 +119,14 @@ accepted compatibility risk: the forced package hash does not prove ABI
 identity with the RTL8261CE, Airoha PPE, bridge or MT7996 patches. Rebuild this
 profile when a new module is operationally important.
 
+The exact public kmods path belongs to OpenWrt snapshots and is not guaranteed
+to remain online indefinitely. `CONFIG_ALL_KMODS` compiles the packages but
+this release does not claim to host a permanent custom APK repository. The
+unrelated Telephony `kmod-ipt-rtpengine` is the sole explicit exception because
+its pinned feed revision cannot compile against Linux 6.18.39
+(`xt_RTPENGINE.h` is absent). Use targeted `apk add` transactions only; never
+bulk-upgrade the image from LuCI or with `apk upgrade`.
+
 ## Included administration and tools
 
 - FlowSense 1.1.4 and Airoha NPU status panels

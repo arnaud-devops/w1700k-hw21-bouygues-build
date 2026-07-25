@@ -95,7 +95,10 @@ relevant build-system changes from Fanboy commit `0abbad3617e5`: generation of
 the target kmods repository outside buildbot jobs and optional replacement of
 the locally computed `.vermagic` with `files/etc/vermagic.txt`.
 
-The profile deliberately enables `CONFIG_ALL_KMODS`. The buildbot hash
+The profile deliberately enables `CONFIG_ALL_KMODS`, with only
+`kmod-ipt-rtpengine` disabled because the unrelated SIP media-proxy module in
+the pinned Telephony feed cannot compile against Linux 6.18.39 due to its
+missing `xt_RTPENGINE.h` header. The buildbot hash
 `7a95fc2977560f4c28e39a71bf89c960` and its Linux
 `6.18.39-1` Airoha repository URL are stored and checksummed locally rather
 than fetched dynamically from `w1700k.github.io`. This makes repeated builds
