@@ -21,9 +21,10 @@ OpenWrt PR 24038. Bridge offload has an independent UCI gate and is disabled
 by default; routed flow offload remains enabled.
 
 All feeds, GitHub Actions and builder images are pinned. Feed commits are not
-newer than the immutable Hurryman source. Two checksum-locked, build-time-only
-metadata fixes remove known Kconfig cycles in unused FreeRADIUS and
-trafficshaper package definitions; neither package is installed in the image.
-The build keeps `nftables-json`, uses its native kernel ABI and publishes its
-own matching APK repository. It never forces the public OpenWrt buildbot
-vermagic.
+newer than the immutable Hurryman source. A checksum-locked, build-time-only
+metadata fix removes the known `trafficshaper`/nftables provider cycle. The
+unused FreeRADIUS package family is excluded from Kconfig metadata because its
+optional plugin graph contains a separate transitive cycle; it is neither
+installed nor published. The build keeps `nftables-json`, uses its native
+kernel ABI and publishes its own matching APK repository. It never forces the
+public OpenWrt buildbot vermagic.

@@ -1,0 +1,2 @@
+# Feed package metadata excluded from Kconfig; none is installed or published.
+packages freeradius3
