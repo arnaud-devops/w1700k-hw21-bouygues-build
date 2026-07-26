@@ -285,9 +285,9 @@ jobs:
               target/linux/generic/files/drivers/net/phy/rtl8261ce/rtk_rtl8261ce_phy.c
             grep -Fq "FIELD_GET(RTL8261CE_PHYID2_MODEL_MASK, phyid2)" \
               target/linux/generic/files/drivers/net/phy/rtl8261ce/rtk_rtl8261ce_phy.c
-            grep -Fq "config.flow_offloading_bridge" \
+            grep -Fq "fw4.default_option(\"flow_offloading_bridge\")" \
               package/network/config/firewall4/patches/001-add-bridge-flowtable-support.patch
-            grep -Fq "\"flow_offloading_bridge\", \"bool\", \"0\"" \
+            grep -Fq "flow_offloading_bridge: [ \"bool\", \"0\" ]" \
               package/network/config/firewall4/patches/001-add-bridge-flowtable-support.patch
             grep -Fq "ramoops@86ff0000" target/linux/airoha/dts/an7581.dtsi
             if grep -R -Fq "../../../files/etc/vermagic.txt" include; then
