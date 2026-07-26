@@ -445,8 +445,14 @@ jobs:
                 exit 1
               fi
             done
-            grep -qx "# CONFIG_PACKAGE_kmod-ipt-rtpengine is not set" .config
-            grep -qx "# CONFIG_PACKAGE_dnsmasq is not set" .config
+            for disabled in \
+              CONFIG_PACKAGE_dnsmasq \
+              CONFIG_PACKAGE_kmod-ipt-rtpengine; do
+              if grep -Eq "^${disabled}=[ym]$" .config; then
+                echo "::error::Disabled build option unexpectedly enabled: $disabled"
+                exit 1
+              fi
+            done
             ./scripts/diffconfig.sh > "$DK_BIN/config.diff"
             printf "CONFIG_VERSION_NUMBER=\"%s-v2.4\"\n" "$SOURCE_VERSION_CODE" >> .config
 
