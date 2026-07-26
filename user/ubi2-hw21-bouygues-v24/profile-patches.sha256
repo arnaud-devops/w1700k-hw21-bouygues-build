@@ -1,2 +1,2 @@
-6bc2cb31e4cf0a7d2a3853b59e06e4650967039213ea4ea6b3f2e2f0df74fc09  ./patches/0001-v24-remove-buildbot-vermagic-and-risky-defaults.patch
+d494544dc1e545b85ee4ee7fe925d4f9eace6e8f10804c53f2f1c7e534ca9398  ./patches/0001-v24-remove-buildbot-vermagic-and-risky-defaults.patch
 09fa20688be4888b3177938b962a51c39c0eb7f27cbd9cd52abbcd6e76be60c2  ./patches/0002-rtl8261ce-require-ce-pma-model-at-bind-time.patch

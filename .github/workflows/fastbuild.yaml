@@ -294,9 +294,16 @@ jobs:
               "profile patch tree" "./patches"
             shopt -s nullglob
             for profile_patch in "$DK_PROFILE"/patches/*.patch; do
-              patch -d . -p0 --forward < "$profile_patch"
+              patch -d . -p0 --forward --fuzz=0 --no-backup-if-mismatch \
+                < "$profile_patch"
             done
             shopt -u nullglob
+            patch_debris=$(find . -type f \
+              \( -name '*.orig' -o -name '*.rej' \) -print -quit)
+            [ -z "$patch_debris" ] || {
+              echo "::error::Patch debris found after profile preparation: $patch_debris"
+              exit 1
+            }
 
             verify_tree_lock "$DK_PROFILE/files" \
               "$DK_PROFILE/profile-files.sha256" "profile file tree"
