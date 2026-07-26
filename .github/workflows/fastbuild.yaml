@@ -257,6 +257,11 @@ jobs:
               echo "::error::trafficshaper recursive nftables provider remains"
               exit 1
             fi
+            if grep -Eq "GstBuild(Library,gl|Plugin,opengl)" \
+              feeds/packages/multimedia/gst1-plugins-base/Makefile; then
+              echo "::error::Unavailable GStreamer GL metadata remains"
+              exit 1
+            fi
             ./scripts/feeds install -a
             [ -s "$DK_PROFILE/excluded-feed-packages.txt" ] || {
               echo "::error::Missing excluded feed package policy"

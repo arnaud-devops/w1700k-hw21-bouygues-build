@@ -1,1 +1,2 @@
 794e9d9eca64e9dd7e6366821b7691da37d86c1c910e17ceb68e7d46ca1c5c52  ./packages/0002-trafficshaper-avoid-nftables-provider-cycle.patch
+e4ce2295d5768248ee72911920b5a849112b31c743ca8e60a7683e31b5f1ef2c  ./packages/0003-gstreamer-disable-unavailable-gl-metadata.patch
