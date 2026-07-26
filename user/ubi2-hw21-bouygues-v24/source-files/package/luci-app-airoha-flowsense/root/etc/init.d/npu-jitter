@@ -1,0 +1,47 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=10
+USE_PROCD=1
+
+DAEMON=/usr/libexec/npu-jitter-daemon
+PIDFILE=/var/run/npu-jitter.pid
+
+start_service() {
+	local enabled target
+	# Preserve the custom profile policy: the permanent external probe is
+	# installed for FlowSense, but must be explicitly enabled.
+	enabled=$(uci -q get npu-monitor.jitter.enabled || \
+		uci -q get npu-monitor.@jitter[0].enabled)
+	[ "$enabled" = 1 ] || return 0
+
+	# Support both named and legacy anonymous sections. With no configured
+	# target, prefer the default gateway and use the historical target only
+	# as a last resort.
+	target=$(uci -q get npu-monitor.jitter.target || \
+		uci -q get npu-monitor.@jitter[0].target)
+	[ -n "$target" ] || \
+		target=$(ip -4 route show default 2>/dev/null | awk '/via/ {print $3; exit}')
+	[ -n "$target" ] || target="1.1.1.1"
+
+	procd_open_instance
+	procd_set_param command "$DAEMON" "$target"
+	procd_set_param pidfile "$PIDFILE"
+	procd_set_param respawn 30 5 0
+	procd_set_param stdout 0
+	procd_set_param stderr 0
+	procd_close_instance
+}
+
+stop_service() {
+	rm -f /tmp/npu-jitter.json /tmp/npu-jitter.json.tmp
+}
+
+reload_service() {
+	stop
+	start
+}
+
+service_triggers() {
+	procd_add_reload_trigger "npu-monitor"
+}

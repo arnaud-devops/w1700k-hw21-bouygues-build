@@ -1,0 +1,239 @@
+#!/bin/sh
+
+set -u
+
+failures=0
+warnings=0
+
+pass() {
+	printf 'PASS  %s\n' "$*"
+}
+
+warn() {
+	printf 'WARN  %s\n' "$*"
+	warnings=$((warnings + 1))
+}
+
+fail() {
+	printf 'FAIL  %s\n' "$*"
+	failures=$((failures + 1))
+}
+
+check_command() {
+	label="$1"
+	shift
+	if "$@" >/dev/null 2>&1; then
+		pass "$label"
+	else
+		fail "$label"
+	fi
+}
+
+printf 'W1700K HW2.1 Bouygues v2.4 health check\n'
+# shellcheck disable=SC1091
+printf 'release=%s kernel=%s\n' \
+	"$(. /etc/openwrt_release 2>/dev/null; printf '%s' "${DISTRIB_REVISION:-unknown}")" \
+	"$(uname -r)"
+
+for patch in \
+	'972-net-airoha-sync-UPDMEM-source-MAC-for-offloaded-IPv6.patch' \
+	'973-net-airoha-UPDMEM-slot-allocator-for-IPv6-source-MACs.patch'; do
+	if grep -Fq "$patch" /build_info 2>/dev/null; then
+		pass "$patch is recorded in build provenance"
+	else
+		fail "$patch is missing from build provenance"
+	fi
+done
+if grep -Fq '971-net-airoha-sync-UPDMEM-source-MAC-for-offloaded-IPv6.patch' /build_info 2>/dev/null; then
+	fail 'superseded patch 971 is present in build provenance'
+else
+	pass 'superseded patch 971 is absent'
+fi
+if grep -Fq '965-net-airoha-disable-hw-offload-for-ipv6-vlan-uplink-only.patch' /build_info 2>/dev/null; then
+	fail 'fallback patch 965 is present in build provenance'
+else
+	pass 'fallback patch 965 is absent'
+fi
+
+# shellcheck disable=SC1091
+. /etc/w1700k-build-release 2>/dev/null || true
+expected_kmods="https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/download/${release_tag:-missing}/w1700k-kmods.adb"
+if [ -n "${release_tag:-}" ] &&
+	grep -Fqx "$expected_kmods" /etc/apk/repositories.d/customfeeds.list 2>/dev/null; then
+	pass 'exact native-ABI kmods repository configured'
+else
+	fail 'native-ABI kmods repository missing or mismatched'
+fi
+if grep -Eq 'downloads\.openwrt\.org/.*/kmods/' \
+	/etc/apk/repositories.d/*.list 2>/dev/null; then
+	fail 'an incompatible official buildbot kmods repository is configured'
+else
+	pass 'official buildbot kmods repository absent'
+fi
+if [ -s /etc/apk/keys/w1700k-v24.pem ] &&
+	cmp -s /etc/apk/keys/public-key.pem /etc/apk/keys/w1700k-v24.pem; then
+	pass 'native repository signing key preserved for sysupgrade recovery'
+else
+	fail 'native repository recovery signing key is missing or mismatched'
+fi
+if apk info -e kernel >/dev/null 2>&1; then
+	pass 'native kernel ABI package installed'
+else
+	fail 'kernel ABI package missing'
+fi
+
+for device in wan lan2; do
+	driver="$(readlink "/sys/class/net/$device/phydev/driver" 2>/dev/null || true)"
+	case "$driver" in
+		*RTL8261CE*) pass "$device uses the RTL8261CE driver" ;;
+		*) fail "$device RTL8261CE binding (found: ${driver:-none})" ;;
+	esac
+	carrier="$(cat "/sys/class/net/$device/carrier" 2>/dev/null || true)"
+	speed="$(cat "/sys/class/net/$device/speed" 2>/dev/null || true)"
+	if [ "$carrier" = 1 ]; then
+		pass "$device carrier up at ${speed:-unknown} Mbit/s"
+	else
+		warn "$device carrier is down"
+	fi
+done
+
+if [ "$(uci -q get firewall.@defaults[0].flow_offloading)" = 1 ]; then
+	pass 'software flow offload enabled'
+else
+	fail 'software flow offload disabled'
+fi
+if [ "$(uci -q get firewall.@defaults[0].flow_offloading_hw)" = 1 ]; then
+	pass 'hardware flow offload enabled'
+else
+	fail 'hardware flow offload disabled'
+fi
+if nft list chain inet fw4 forward 2>/dev/null |
+	grep -Fq 'meta l4proto { tcp, udp } flow add @ft'; then
+	pass 'normal dual-stack fw4 rule active'
+else
+	fail 'normal dual-stack fw4 rule missing'
+fi
+
+if [ "$(uci -q get firewall.@defaults[0].flow_offloading_bridge)" = 1 ]; then
+	if nft list flowtable bridge fw4 fb >/dev/null 2>&1; then
+		pass 'experimental bridge flowtable explicitly enabled and present'
+	else
+		fail 'bridge flowtable enabled in UCI but absent from nftables'
+	fi
+else
+	if nft list flowtable bridge fw4 fb >/dev/null 2>&1; then
+		fail 'bridge flowtable present while its independent gate is disabled'
+	else
+		pass 'experimental bridge flowtable disabled by default policy'
+	fi
+fi
+
+cpu_max="$(cat /sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq 2>/dev/null || true)"
+case "$cpu_max" in
+	''|*[!0-9]*) warn 'CPU maximum frequency is unavailable' ;;
+	*) if [ "$cpu_max" -le 1200000 ]; then
+		pass "CPU maximum remains stock (${cpu_max} kHz)"
+	else
+		fail "CPU maximum exceeds stock (${cpu_max} kHz)"
+	fi ;;
+esac
+cpu_governor="$(cat /sys/devices/system/cpu/cpufreq/policy0/scaling_governor 2>/dev/null || true)"
+if [ "$cpu_governor" = performance ]; then
+	warn 'CPU governor is performance (administrator override)'
+elif [ -n "$cpu_governor" ]; then
+	pass "adaptive CPU governor active ($cpu_governor)"
+else
+	warn 'CPU governor is unavailable'
+fi
+if ethtool -k wan 2>/dev/null | grep -Eq '^rx-gro-hw:[[:space:]]+off'; then
+	pass 'hardware LRO/GRO is available but disabled'
+else
+	warn 'WAN hardware LRO/GRO is enabled or not reported'
+fi
+
+check_command 'dnsproxy service running' /etc/init.d/dnsproxy status
+if nslookup openwrt.org 127.0.0.1:5353 >/dev/null 2>&1; then
+	pass 'local DoQ proxy answers'
+else
+	fail 'local DoQ proxy does not answer'
+fi
+if [ "$(uci -q get dhcp.@dnsmasq[0].server)" = '127.0.0.1#5353' ]; then
+	pass 'dnsmasq forwards to dnsproxy'
+else
+	fail 'dnsmasq is not chained to dnsproxy'
+fi
+
+configured_aps=0
+for section in $(uci -q show wireless 2>/dev/null |
+	sed -n 's/^wireless\.\([^.=]*\)=wifi-iface$/\1/p'); do
+	[ "$(uci -q get "wireless.$section.mode")" = ap ] || continue
+	[ "$(uci -q get "wireless.$section.disabled")" = 1 ] && continue
+	configured_aps=$((configured_aps + 1))
+done
+enabled_hostapd_aps=0
+up_hostapd_aps=0
+for hostapd_object in $(ubus list 'hostapd.*' 2>/dev/null); do
+	[ "$(ubus call "$hostapd_object" get_status 2>/dev/null |
+		jsonfilter -e '@.status' 2>/dev/null)" = ENABLED ] || continue
+	enabled_hostapd_aps=$((enabled_hostapd_aps + 1))
+	ap_name="${hostapd_object#hostapd.}"
+	[ "$(cat "/sys/class/net/$ap_name/operstate" 2>/dev/null)" = up ] || continue
+	up_hostapd_aps=$((up_hostapd_aps + 1))
+done
+if [ "$enabled_hostapd_aps" -ge "$configured_aps" ]; then
+	pass "$configured_aps configured APs have enabled hostapd objects"
+else
+	fail "configured APs=$configured_aps enabled hostapd=$enabled_hostapd_aps"
+fi
+if [ "$up_hostapd_aps" -ge "$configured_aps" ]; then
+	pass "$configured_aps configured APs have operational netdevs"
+else
+	fail "configured APs=$configured_aps operational hostapd netdevs=$up_hostapd_aps"
+fi
+
+if [ "$(uci -q get irqbalance.irqbalance.enabled)" = 1 ]; then
+	check_command 'irqbalance enabled and running' /etc/init.d/irqbalance status
+else
+	warn 'irqbalance is disabled'
+fi
+check_command 'Watchcat running' /etc/init.d/watchcat status
+
+if [ "$(uci -q get ttyd.@ttyd[0].interface)" = '@lan' ] &&
+	[ "$(uci -q get ttyd.@ttyd[0].command)" = '/bin/login' ] &&
+	[ "$(uci -q get ttyd.@ttyd[0].ssl)" = 1 ] &&
+	[ "$(uci -q get ttyd.@ttyd[0].ssl_cert)" = '/etc/uhttpd.crt' ] &&
+	[ "$(uci -q get ttyd.@ttyd[0].ssl_key)" = '/etc/uhttpd.key' ]; then
+	if [ -s /etc/uhttpd.crt ] && [ -s /etc/uhttpd.key ]; then
+		check_command 'LAN-bound TLS ttyd Web terminal running' /etc/init.d/ttyd status
+	else
+		fail 'ttyd TLS certificate or key is missing'
+	fi
+else
+	fail 'ttyd is not restricted to @lan with TLS and /bin/login'
+fi
+
+if [ "$(uci -q get librespeed-go.config.enabled)" = 1 ]; then
+	check_command 'LibreSpeed explicitly enabled and running' /etc/init.d/librespeed-go status
+else
+	pass 'LibreSpeed installed and disabled by default'
+fi
+
+if command -v owut >/dev/null 2>&1 ||
+	apk info -e luci-app-attendedsysupgrade >/dev/null 2>&1; then
+	fail 'public Attended Sysupgrade tooling must not be present'
+else
+	pass 'unsafe public Attended Sysupgrade tooling absent'
+fi
+
+jitter_enabled="$(uci -q get npu-monitor.jitter.enabled ||
+	uci -q get npu-monitor.@jitter[0].enabled)"
+if [ "$jitter_enabled" = 1 ]; then
+	check_command 'FlowSense jitter probe enabled and running' /etc/init.d/npu-jitter status
+else
+	pass 'FlowSense jitter probe disabled by default policy'
+fi
+
+/usr/local/sbin/w1700k-pstore-collect --status || warn 'pstore is unavailable'
+
+printf 'summary failures=%s warnings=%s\n' "$failures" "$warnings"
+[ "$failures" -eq 0 ]

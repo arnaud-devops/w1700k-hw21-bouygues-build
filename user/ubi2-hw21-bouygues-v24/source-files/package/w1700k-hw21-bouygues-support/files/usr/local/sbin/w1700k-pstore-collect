@@ -1,0 +1,69 @@
+#!/bin/sh
+
+set -u
+
+SOURCE=/sys/fs/pstore
+BOOT_DEST=/tmp/pstore-last-boot
+
+collect() {
+	destination="$1"
+	mkdir -p "$destination"
+	found=0
+	for source_file in "$SOURCE"/*; do
+		[ -f "$source_file" ] || continue
+		cp -f "$source_file" "$destination/${source_file##*/}"
+		found=1
+	done
+	[ "$found" -eq 1 ]
+}
+
+show() {
+	found=0
+	for source_file in "$SOURCE"/*; do
+		[ -f "$source_file" ] || continue
+		printf '\n===== %s =====\n' "${source_file##*/}"
+		cat "$source_file"
+		found=1
+	done
+	[ "$found" -eq 1 ]
+}
+
+case "${1:---status}" in
+	--boot)
+		if collect "$BOOT_DEST"; then
+			logger -t w1700k-pstore "previous crash data copied to $BOOT_DEST"
+		fi
+		;;
+	--copy)
+		[ "$#" -eq 2 ] || {
+			printf 'usage: %s --copy DIRECTORY\n' "$0" >&2
+			exit 2
+		}
+		collect "$2"
+		;;
+	--show)
+		show
+		;;
+	--clear)
+		for source_file in "$SOURCE"/*; do
+			[ -f "$source_file" ] || continue
+			rm -f "$source_file"
+		done
+		;;
+	--status)
+		[ -d "$SOURCE" ] || {
+			printf 'pstore=unavailable\n'
+			exit 1
+		}
+		count=0
+		for source_file in "$SOURCE"/*; do
+			[ -f "$source_file" ] || continue
+			count=$((count + 1))
+		done
+		printf 'pstore=available files=%s boot_copy=%s\n' "$count" "$BOOT_DEST"
+		;;
+	*)
+		printf 'usage: %s [--status|--show|--copy DIRECTORY|--clear]\n' "$0" >&2
+		exit 2
+		;;
+esac

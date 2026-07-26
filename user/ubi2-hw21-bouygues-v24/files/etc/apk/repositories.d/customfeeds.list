@@ -1,0 +1,2 @@
+# Native kernel ABI repository for this exact W1700K v2.4 build.
+https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/download/@RELEASE_TAG@/w1700k-kmods.adb

@@ -1,0 +1,132 @@
+--- include/kernel-defaults.mk
++++ include/kernel-defaults.mk
+@@ -127,7 +127,6 @@ define Kernel/Configure/Default
+ 	}
+ 	$(_SINGLE) [ -d $(LINUX_DIR)/user_headers ] || $(KERNEL_MAKE) $(if $(findstring uml,$(BOARD)),ARCH=$(ARCH)) INSTALL_HDR_PATH=$(LINUX_DIR)/user_headers headers_install
+ 	grep '=[ym]' $(LINUX_DIR)/.config.set | LC_ALL=C sort | $(MKHASH) md5 > $(LINUX_DIR)/.vermagic
+-	[ ! -f ../../../files/etc/vermagic.txt ] || cp ../../../files/etc/vermagic.txt $(LINUX_DIR)/.vermagic
+ endef
+ 
+ define Kernel/Configure/Initramfs
+--- include/feeds.mk
++++ include/feeds.mk
+@@ -53,7 +53,6 @@ define FeedSourcesAppendAPK
+   echo '%U/targets/%S/packages/packages.adb'; \
+   $(strip $(if $(CONFIG_PER_FEED_REPO), \
+ 	echo '%U/packages/%A/base/packages.adb'; \
+-	echo '%U/targets/%S/kmods/$(LINUX_VERSION)-$(LINUX_RELEASE)-$(LINUX_VERMAGIC)/packages.adb'; \
+ 	$(foreach feed,$(FEEDS_AVAILABLE), \
+ 		$(if $(CONFIG_FEED_$(feed)), \
+ 			echo '$(if $(filter m,$(CONFIG_FEED_$(feed))),# )%U/packages/%A/$(feed)/packages.adb';)))) \
+--- target/linux/airoha/an7581/config-6.18
++++ target/linux/airoha/an7581/config-6.18
+@@ -62,8 +62,8 @@ CONFIG_CONTEXT_TRACKING_IDLE=y
+ CONFIG_CPUFREQ_DT=y
+ CONFIG_CPUFREQ_DT_PLATDEV=y
+ CONFIG_CPU_FREQ=y
+-# CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND is not set
+-CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++# CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE is not set
+ CONFIG_CPU_FREQ_GOV_ATTR_SET=y
+ CONFIG_CPU_FREQ_GOV_COMMON=y
+ CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
+@@ -221,6 +221,6 @@ CONFIG_NET_AIROHA=m
+ # CONFIG_NET_AIROHA_FLOW_STATS is not set
+ CONFIG_NET_AIROHA_NPU=m
+-CONFIG_NET_AIROHA_SOE=y
++# CONFIG_NET_AIROHA_SOE is not set
+ CONFIG_NET_DEVLINK=y
+ CONFIG_NET_DSA=y
+ CONFIG_NET_DSA_MT7530=m
+--- target/linux/airoha/an7581/target.mk
++++ target/linux/airoha/an7581/target.mk
+@@ -8,7 +8,6 @@ FEATURES+=pwm
+ 
+ DEFAULT_PACKAGES += \
+-	airoha-en7581-npu-firmware uboot-envtools kmod-crypto-hw-eip93 \
+-	bridge-flow-offload
++	airoha-en7581-npu-firmware uboot-envtools kmod-crypto-hw-eip93
+ 
+ define Target/Description
+ 	Build firmware images for Airoha an7581 ARM based boards.
+--- target/linux/airoha/an7581/base-files/etc/hotplug.d/iface/51-bridge-flow-offload
++++ /dev/null
+@@ -1,13 +0,0 @@
+-#!/bin/sh
+-
+-[ "$ACTION" = ifup ] || exit 0
+-[ "$INTERFACE" = lan ] || exit 0
+-
+-(
+-	exec 9>/var/lock/bridge-flow-offload.lock
+-	flock -n 9 || exit 0
+-	sleep 10
+-	/usr/share/bridge-flow-offload/apply-rules.sh
+-) &
+-
+-exit 0
+--- target/linux/airoha/patches-6.18/916-02-net-airoha-Implement-HW-GRO-TCP-support.patch
++++ target/linux/airoha/patches-6.18/916-02-net-airoha-Implement-HW-GRO-TCP-support.patch
+@@ -536,7 +536,7 @@
+ -	netdev->features |= netdev->hw_features;
+ -	netdev->vlan_features = netdev->hw_features;
+ +	netdev->hw_features = AIROHA_HW_FEATURES | NETIF_F_GRO_HW;
+-+	netdev->features |= AIROHA_HW_FEATURES | NETIF_F_GRO_HW;
+++	netdev->features |= AIROHA_HW_FEATURES;
+ +	netdev->vlan_features = AIROHA_HW_FEATURES;
+  	SET_NETDEV_DEV(netdev, eth->dev);
+ 
+--- target/linux/airoha/dts/an7581.dtsi
++++ target/linux/airoha/dts/an7581.dtsi
+@@ -232,26 +232,6 @@
+ 			opp-hz = /bits/ 64 <1200000000>;
+ 			required-opps = <&smcc_opp10>;
+ 		};
+-
+-		opp-12500000000 {
+-			opp-hz = /bits/ 64 <1250000000>;
+-			required-opps = <&smcc_opp11>;
+-		};
+-
+-		opp-13000000000 {
+-			opp-hz = /bits/ 64 <1300000000>;
+-			required-opps = <&smcc_opp12>;
+-		};
+-
+-		opp-13500000000 {
+-			opp-hz = /bits/ 64 <1350000000>;
+-			required-opps = <&smcc_opp13>;
+-		};
+-
+-		opp-14000000000 {
+-			opp-hz = /bits/ 64 <1400000000>;
+-			required-opps = <&smcc_opp14>;
+-		};
+ 	};
+ 
+ 	cpu_smcc_opp_table: opp-table-cpu-smcc {
+--- package/kernel/linux/modules/netdevices.mk
++++ package/kernel/linux/modules/netdevices.mk
+@@ -693,18 +693,14 @@ $(eval $(call KernelPackage,airoha-npu))
+ define KernelPackage/airoha-eth
+   SUBMENU:=$(NETWORK_DEVICES_MENU)
+   TITLE:=Airoha SoC Gigabit Ethernet support
+-  DEPENDS:=@TARGET_airoha +kmod-airoha-npu +kmod-of-mdio \
+-	+kmod-ipsec4-offload
+-  KCONFIG:= \
+-	CONFIG_NET_AIROHA \
+-	CONFIG_NET_AIROHA_SOE=y
++  DEPENDS:=@TARGET_airoha +kmod-airoha-npu +kmod-of-mdio
++  KCONFIG:=CONFIG_NET_AIROHA
+   FILES:=$(LINUX_DIR)/drivers/net/ethernet/airoha/airoha-eth.ko
+   AUTOLOAD:=$(call AutoLoad,41,airoha-eth,1)
+ endef
+ 
+ define KernelPackage/airoha-eth/description
+-  Kernel module for Airoha SoC Gigabit Ethernet.
+-  Includes PPE and SOE support for hardware flow and ESP offloading.
++  Kernel module for Airoha SoC Ethernet and PPE flow offloading.
+ endef
+ 
+ $(eval $(call KernelPackage,airoha-eth))

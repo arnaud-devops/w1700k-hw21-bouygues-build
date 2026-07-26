@@ -1,0 +1,6 @@
+config ttyd
+	option interface '@lan'
+	option command '/bin/login'
+	option ssl '1'
+	option ssl_cert '/etc/uhttpd.crt'
+	option ssl_key '/etc/uhttpd.key'

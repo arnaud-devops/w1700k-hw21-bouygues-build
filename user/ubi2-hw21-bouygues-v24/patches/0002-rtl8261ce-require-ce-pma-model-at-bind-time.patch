@@ -1,0 +1,37 @@
+--- target/linux/generic/files/drivers/net/phy/rtl8261ce/rtk_rtl8261ce_phy.c
++++ target/linux/generic/files/drivers/net/phy/rtl8261ce/rtk_rtl8261ce_phy.c
+@@ -1079,12 +1079,34 @@ static int rtl8261ce_read_status(struct phy_device *phydev)
+ 	return 0;
+ }
+ 
++/* The outer RTL826x PHY ID is shared with sibling parts handled by the
++ * mainline Realtek driver, notably RTL8261N. Match the PMA/PMD model before
++ * claiming the device so both drivers can coexist without a generic C45
++ * fallback.
++ */
++static int rtl8261ce_match_phy_device(struct phy_device *phydev,
++				      const struct phy_driver *phydrv)
++{
++	int phyid2;
++
++	if (!phydev->is_c45 || !genphy_match_phy_device(phydev, phydrv))
++		return 0;
++
++	phyid2 = phy_read_mmd(phydev, MDIO_MMD_PMAPMD, MDIO_DEVID2);
++	if (phyid2 < 0)
++		return 0;
++
++	return FIELD_GET(RTL8261CE_PHYID2_MODEL_MASK, phyid2) ==
++	       RTL8261CE_PHYID2_MODEL;
++}
++
+ /* Register the standalone CE driver. The generic Realtek driver also handles
+  * other RTL826x parts, but W1700K2 needs the CE-specific SerDes polarity path.
+  */
+ static struct phy_driver rtl8261ce_drvs[] = {
+ 	{
+ 		PHY_ID_MATCH_MODEL(RTL8261CE_PHY_ID),
++		.match_phy_device = rtl8261ce_match_phy_device,
+ 		.name = "Realtek RTL8261CE",
+ 		.probe = rtl8261ce_probe,
+ 		.config_init = rtl8261ce_config_init,

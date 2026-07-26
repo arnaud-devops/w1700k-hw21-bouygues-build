@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# Reload fw4 after a Wi-Fi AP appears, but only when the independent,
+# experimental bridge-flowtable gate is enabled.
+
+[ "$ACTION" = "add" ] || exit 0
+[ "$(uci -q get firewall.@defaults[0].flow_offloading_bridge)" = 1 ] ||
+	exit 0
+
+DEV="${DEVICENAME:-$INTERFACE}"
+[ -n "$DEV" ] || exit 0
+
+case "$DEV" in
+	phy*-ap*|ap-mld*) ;;
+	*) exit 0 ;;
+esac
+
+# Skip if fw4 already included this AP in the bridge flowtable.
+nft list flowtable bridge fw4 fb 2>/dev/null |
+	grep -qw "\"$DEV\"" && exit 0
+
+# Wait for any in-flight reload. A non-blocking lock can permanently miss an
+# AP that appeared while an earlier reload was still taking its device list.
+(
+	mkdir -p /var/lock
+	exec 9>/var/lock/fw4-bridge-reload.lock
+	flock 9
+	[ "$(uci -q get firewall.@defaults[0].flow_offloading_bridge)" = 1 ] ||
+		exit 0
+	nft list flowtable bridge fw4 fb 2>/dev/null |
+		grep -qw "\"$DEV\"" && exit 0
+	sleep 2
+	/etc/init.d/firewall reload >/dev/null 2>&1
+	if nft list flowtable bridge fw4 fb 2>/dev/null |
+		grep -qw "\"$DEV\""; then
+		logger -t fw4-bridge-reload "$DEV added to bridge flowtable"
+	else
+		logger -t fw4-bridge-reload \
+			"WARNING: $DEV missing after firewall reload"
+	fi
+) &
+
+exit 0

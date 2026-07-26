@@ -1,0 +1,11 @@
+#!/bin/sh /etc/rc.common
+
+# rc.common consumes these globals after sourcing this file.
+# shellcheck disable=SC2034
+START=12
+# shellcheck disable=SC2034
+STOP=90
+
+start() {
+	/usr/local/sbin/w1700k-pstore-collect --boot >/dev/null 2>&1 || true
+}

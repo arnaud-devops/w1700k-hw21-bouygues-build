@@ -1,0 +1,6 @@
+release_tag=@RELEASE_TAG@
+builder_commit=@BUILDER_COMMIT@
+source_commit=2d02d62666bd8f6ef89b193238c58984db592330
+bridge_offload_default=disabled
+hardware_lro_default=disabled
+cpu_max_mhz=1200

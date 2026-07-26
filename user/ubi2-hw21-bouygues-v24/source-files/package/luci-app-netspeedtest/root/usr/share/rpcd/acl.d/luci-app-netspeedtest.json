@@ -1,0 +1,17 @@
+{
+  "luci-app-netspeedtest": {
+    "description": "Grant access to netspeedtest procedures",
+    "read": {
+      "ubus": {
+        "service": [ "list" ]
+      },
+      "uci": [ "netspeedtest", "librespeed-go" ]
+    },
+    "write": {
+      "file": {
+        "/etc/init.d/netspeedtest": [ "exec" ]
+      },
+      "uci": [ "netspeedtest", "librespeed-go" ]
+    }
+  }
+}
