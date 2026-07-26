@@ -1,2 +1,3 @@
 # Feed package metadata excluded from Kconfig; none is installed or published.
 packages freeradius3
+packages gst1-plugins-base

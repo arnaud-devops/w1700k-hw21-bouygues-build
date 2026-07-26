@@ -24,7 +24,9 @@ All feeds, GitHub Actions and builder images are pinned. Feed commits are not
 newer than the immutable Hurryman source. A checksum-locked, build-time-only
 metadata fix removes the known `trafficshaper`/nftables provider cycle. The
 unused FreeRADIUS package family is excluded from Kconfig metadata because its
-optional plugin graph contains a separate transitive cycle; it is neither
-installed nor published. The build keeps `nftables-json`, uses its native
-kernel ABI and publishes its own matching APK repository. It never forces the
-public OpenWrt buildbot vermagic.
+optional plugin graph contains a separate transitive cycle. The unused
+GStreamer base plugin metadata is also excluded because its optional video
+dependencies are not present in these feeds. None of those packages is
+installed or published. The build keeps `nftables-json`, uses its native kernel
+ABI and publishes its own matching APK repository. It never forces the public
+OpenWrt buildbot vermagic.
