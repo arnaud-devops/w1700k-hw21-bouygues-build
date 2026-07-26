@@ -16,9 +16,10 @@ rm -f \
 	files/www/cgi-bin/github_check \
 	files/www/cgi-bin/github_fetch
 
-# Hurryman's SOE/XFRM/LAG series is unrelated to this routed WAN use case and
-# substantially increases the untested kernel surface. Verify the exact pinned
-# source before removing it so upstream drift cannot silently change policy.
+# Hurryman's SOE/XFRM/LAG series and its mt76 callback companion are unrelated
+# to this routed WAN use case and substantially increase the untested kernel
+# surface. Verify the exact pinned source before removing them so upstream
+# drift cannot silently change policy.
 excluded_lock="$DK_PROFILE/excluded-patches.sha256"
 [ -s "$excluded_lock" ] || {
 	echo "missing excluded patch checksum lock: $excluded_lock" >&2
@@ -29,12 +30,16 @@ while read -r _ patch; do
 	[ -n "$patch" ] || continue
 	rm -f "$patch"
 done < "$excluded_lock"
-[ "$(wc -l < "$excluded_lock")" -eq 46 ] || {
+[ "$(wc -l < "$excluded_lock")" -eq 47 ] || {
 	echo "unexpected SOE/XFRM/LAG exclusion count" >&2
 	exit 1
 }
 if find target/linux/airoha -type f -name '9999-*' | grep -q .; then
 	echo "an unreviewed Airoha 9999 experimental patch remains" >&2
+	exit 1
+fi
+if [ -e package/kernel/mt76/patches/9993-wifi-mt76-distinguish-flowtable-callbacks.patch ]; then
+	echo "the SOE flowtable-context mt76 companion remains" >&2
 	exit 1
 fi
 airoha_eth_package=$(sed -n \

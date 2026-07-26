@@ -18,6 +18,7 @@ EXPECTED_RTL_PATCH="09fa20688be4888b3177938b962a51c39c0eb7f27cbd9cd52abbcd6e76be
 EXPECTED_POLICY_PATCH="0f7d4f42079a5a8d5692211494277c7aed52125bc13b32384bd6ecffd411e437"
 EXPECTED_FW4_PATCH="712848a7a5a348bd87b4f4b153fe62c97a3cb01c77b9ed0de0df2cf2e3c2e8b7"
 EXPECTED_RECOVERY="ef7968b48909c838aadb8de388ded577e1ba04b7eae107cc053ff2018e1ac5fd"
+EXPECTED_MT76_SOE_COMPANION="11438ddb5aef99f3e9ef359c5c96d1ce04ac46c2b273d12baec3b3b0a0d9c615"
 REPOSITORY="arnaud-devops/w1700k-hw21-bouygues-build"
 
 usage() {
@@ -275,6 +276,9 @@ for expected_line in \
 	grep -Fq "$expected_line" "$build_info" ||
 		fail "provenance line absent: $expected_line"
 done
+grep -Fq \
+	"$EXPECTED_MT76_SOE_COMPANION  package/kernel/mt76/patches/9993-wifi-mt76-distinguish-flowtable-callbacks.patch" \
+	"$build_info" || fail "excluded mt76 SOE companion provenance absent"
 for forbidden_text in \
 	'971-net-airoha-sync-UPDMEM-source-MAC-for-offloaded-IPv6.patch' \
 	'965-net-airoha-disable-hw-offload-for-ipv6-vlan-uplink-only.patch' \

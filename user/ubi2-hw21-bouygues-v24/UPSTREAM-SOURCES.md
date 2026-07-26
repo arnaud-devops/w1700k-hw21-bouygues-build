@@ -9,8 +9,9 @@ The v2.4 image is built from Hurryman's immutable 25.07 source commit:
 
 The profile keeps the W1700K hardware, Wi-Fi, RTL8261CE, NPU, bridge-flow and
 reassociation fixes from that source. It deliberately removes the unrelated
-experimental SOE/XFRM/LAG series, restores stock CPU limits and an adaptive
-governor, and leaves hardware LRO available but disabled by default.
+experimental SOE/XFRM/LAG series and its dependent mt76 flowtable-context
+callback patch, restores stock CPU limits and an adaptive governor, and leaves
+hardware LRO available but disabled by default.
 
 The routed IPv6 source-MAC fix is Gilly's `972` plus the experimental
 refcounted UPDMEM allocator `973`. Patches `965` and `971` are forbidden.
