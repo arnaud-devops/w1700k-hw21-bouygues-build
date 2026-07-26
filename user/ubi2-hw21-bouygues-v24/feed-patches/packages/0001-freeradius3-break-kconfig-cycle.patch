@@ -1,0 +1,11 @@
+diff --git a/net/freeradius3/Config.in b/net/freeradius3/Config.in
+--- a/net/freeradius3/Config.in
++++ b/net/freeradius3/Config.in
+@@ -2,7 +2,6 @@
+ choice
+ 	prompt "SSL library"
+ 	default FREERADIUS3_OPENSSL
+-	depends on PACKAGE_freeradius3-common
+ 
+ config FREERADIUS3_NOSSL
+ 	bool "No SSL support"

@@ -239,6 +239,29 @@ jobs:
                 exit 1
               }
             done < "$DK_PROFILE/feeds.lock"
+
+            verify_tree_lock "$DK_PROFILE/feed-patches" \
+              "$DK_PROFILE/feed-patches.sha256" "feed patch tree"
+            shopt -s nullglob
+            for feed_patch in "$DK_PROFILE"/feed-patches/packages/*.patch; do
+              git -C feeds/packages apply --check "$feed_patch"
+              git -C feeds/packages apply "$feed_patch"
+            done
+            shopt -u nullglob
+            git -C feeds/packages diff --check
+            if grep -Fq "depends on PACKAGE_freeradius3-common" \
+              feeds/packages/net/freeradius3/Config.in; then
+              echo "::error::FreeRADIUS recursive Kconfig dependency remains"
+              exit 1
+            fi
+            grep -Fq "+nftables-json" \
+              feeds/packages/net/trafficshaper/Makefile
+            if grep -Fq \
+              "(PACKAGE_nftables-json||PACKAGE_nftables-nojson):nftables" \
+              feeds/packages/net/trafficshaper/Makefile; then
+              echo "::error::trafficshaper recursive nftables provider remains"
+              exit 1
+            fi
             ./scripts/feeds install -a
 
             cp "$DK_PROFILE/config.diff" .config
@@ -326,6 +349,9 @@ jobs:
                 printf "%s " "$feed"
                 git -C "feeds/$feed" rev-parse HEAD
               done < "$DK_PROFILE/feeds.lock"
+              echo
+              echo "Feed metadata patches:"
+              cat "$DK_PROFILE/feed-patches.sha256"
               echo
               echo "Applied profile patches:"
               cat "$DK_PROFILE/profile-patches.sha256"

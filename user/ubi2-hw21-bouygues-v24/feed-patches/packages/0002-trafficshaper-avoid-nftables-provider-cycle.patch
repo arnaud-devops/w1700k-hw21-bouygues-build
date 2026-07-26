@@ -1,0 +1,16 @@
+diff --git a/net/trafficshaper/Makefile b/net/trafficshaper/Makefile
+--- a/net/trafficshaper/Makefile
++++ b/net/trafficshaper/Makefile
+@@ -20,10 +20,7 @@ define Package/trafficshaper
+   CATEGORY:=Network
+   TITLE:=WAN traffic shaper based on LAN addresses
+   DEPENDS:=+tc +kmod-sched-core +kmod-sched-connmark +kmod-ifb \
+-	+(PACKAGE_nftables-json||PACKAGE_nftables-nojson):nftables \
+-	+!(PACKAGE_nftables-json||PACKAGE_nftables-nojson):iptables \
+-	+(IPV6&&!(PACKAGE_nftables-json||PACKAGE_nftables-nojson)):ip6tables \
+-	+kmod-sched-cake \
+-	+!(PACKAGE_nftables-json||PACKAGE_nftables-nojson):iptables-mod-conntrack-extra
++	+nftables-json \
++	+kmod-sched-cake
+   PKGARCH:=all
+ endef

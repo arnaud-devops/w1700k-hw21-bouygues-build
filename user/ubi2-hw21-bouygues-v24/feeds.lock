@@ -1,4 +1,4 @@
-# Feed commits pinned on 2026-07-26.
-packages b036203cbc27ef37c03ed1f8419d8d2b65e481f1
+# Last feed commits not newer than the pinned Hurryman source.
+packages 81d81033e6a278663c6e0414f0ec07d37b1141bd
 luci 96a255dbd96212b1c42cfbd0969425ab6528c8b2
 routing c7872431105f69894201dc522b7560e47d1e8ba9
