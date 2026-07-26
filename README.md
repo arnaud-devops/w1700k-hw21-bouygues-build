@@ -14,18 +14,20 @@ compiled from source; the binary image from Gilly is not repackaged.
 
 ## Status
 
-The v2.3 source candidate adds Fanboy's general-purpose administration and
-post-install kernel-module policy to the audited v2.2 network base. It has not
-yet been compiled or audited as a binary. No custom image has been flashed.
+The v2.3 candidate adds Fanboy's general-purpose administration and
+post-install kernel-module policy to the audited v2.2 network base. It was
+built, published and independently audited offline on 2026-07-26. No custom
+image has been flashed.
 
-The previous v2.2 candidate was built, published and independently audited
-offline on 2026-07-25. It moved to Linux 6.18.39, replaced superseded UPDMEM
-patch `971` with Gilly's `972` and `973`, and updated FlowSense to 1.1.4 while
-retaining the v2.1 hardening. Its release remains labelled:
+The v2.3 release remains labelled:
 
 ```text
 [UNTESTED ON HW2.1 - DO NOT FLASH YET]
 ```
+
+The previous v2.2 candidate is superseded but remains available as the
+narrower offline-audited image without the Fanboy package-management and
+administration additions.
 
 Building or publishing an image does not authorize an automatic router flash.
 No workflow in this repository connects to the router.
@@ -33,10 +35,11 @@ No workflow in this repository connects to the router.
 The active router remains on the separately validated Gilly 17.07 image until
 an explicit hardware-test decision is made.
 
-- [GitHub Actions run 30160373412](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/30160373412)
-- [Untested v2.2 prerelease](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.25_r0%2B35485-0f256a0a7a_2d688dc)
-- [Independent v2.2 audit](AUDIT-2026-07-25-V2.2.md)
+- [GitHub Actions run 30179972239](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/actions/runs/30179972239)
+- [Untested v2.3 prerelease](https://github.com/arnaud-devops/w1700k-hw21-bouygues-build/releases/tag/ubi2-hw21-bouygues_2026.07.26_r0%2B35485-0f256a0a7a_54edeb5)
+- [Independent v2.3 audit](AUDIT-2026-07-26-V2.3.md)
 - [v2.3 Fanboy tools and compatibility policy](V2.3-FANBOY-TOOLS-POLICY.md)
+- [Superseded v2.2 audit](AUDIT-2026-07-25-V2.2.md)
 
 ## Pinned source
 
@@ -73,8 +76,8 @@ The production patch policy is deliberate:
 
 The Gilly 21.07 `675-*` nft flowtable bridge series is retained. It is part of
 the already tested Gilly data path used to discover Wi-Fi/bridge egress ports;
-it is not PR 24038. Removing it would make this first v2 candidate diverge from
-the known working base before hardware validation.
+it is not PR 24038. Removing it would make the v2.3 candidate diverge from the
+known working base before hardware validation.
 
 The workflow fails if `972` or `973` is missing, or if superseded `971` or a
 `965` IPv6/VLAN fallback is found in the applied source tree.
@@ -204,11 +207,11 @@ vermagic/kmods tuple, LAN-only ttyd policy, disabled LibreSpeed default and
 package manifest before creating an untested prerelease. Release assets receive
 GitHub build-provenance attestations.
 
-The previous v2.2 image is 22,463,390 bytes and has SHA-256
-`d733f4f7aafc0aca4d31e3854f9a38b7dfa59d92150748871b11f531081b0b52`.
-The corrected v2.1 image is superseded but remains available as the previous
-offline-audited candidate. The first v2 image is also superseded; its findings
-remain in [`AUDIT-2026-07-20.md`](AUDIT-2026-07-20.md).
+The v2.3 image is 27,513,758 bytes and has SHA-256
+`8a114d40e3d19b302b2b0bd53cd710098651196a774c0ae667233f78265a1baf`.
+The v2.2 and corrected v2.1 images are superseded but remain available as
+narrower offline-audited candidates. The first v2 image is also superseded;
+its findings remain in [`AUDIT-2026-07-20.md`](AUDIT-2026-07-20.md).
 
 ## Hardware gate
 
