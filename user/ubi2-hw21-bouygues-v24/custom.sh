@@ -16,6 +16,22 @@ rm -f \
 	files/www/cgi-bin/github_check \
 	files/www/cgi-bin/github_fetch
 
+# The v2.4 Net Speedtest overlay removes the unpinned Ookla workflow. Copying
+# an overlay does not delete files inherited from Hurryman, so remove both
+# runtime entry points explicitly. iperf3, LibreSpeed and browser nPerf do not
+# use this RPC helper.
+rm -f \
+	package/luci-app-netspeedtest/htdocs/luci-static/resources/view/netspeedtest/speedtest.js \
+	package/luci-app-netspeedtest/root/usr/libexec/rpcd/luci.netspeedtest
+for ookla_path in \
+	package/luci-app-netspeedtest/htdocs/luci-static/resources/view/netspeedtest/speedtest.js \
+	package/luci-app-netspeedtest/root/usr/libexec/rpcd/luci.netspeedtest; do
+	[ ! -e "$ookla_path" ] || {
+		echo "unpinned Ookla runtime remains: $ookla_path" >&2
+		exit 1
+	}
+done
+
 # Hurryman's SOE/XFRM/LAG series and its mt76 callback companion are unrelated
 # to this routed WAN use case and substantially increase the untested kernel
 # surface. Verify the exact pinned source before removing them so upstream

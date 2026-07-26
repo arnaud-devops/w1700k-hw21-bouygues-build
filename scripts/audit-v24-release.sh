@@ -118,7 +118,7 @@ sed -e 's#  firmware/#  #' -e 's#  repository/#  #' \
 pass "release, repository and OpenWrt checksums"
 
 release_tag="$(tr -d '\r\n' < "$release_tag_file")"
-[[ "$release_tag" =~ ^ubi2-hw21-bouygues_2026\.[0-9]{2}\.[0-9]{2}_r35578-2d02d62666_[0-9a-f]{7}$ ]] ||
+[[ "$release_tag" =~ ^ubi2-hw21-bouygues-v24_2026\.[0-9]{2}\.[0-9]{2}_r35578-2d02d62666_[0-9a-f]{7}$ ]] ||
 	fail "unexpected release tag: $release_tag"
 builder_commit="$(sed -n 's/^Builder commit: //p' "$build_info")"
 [[ "$builder_commit" =~ ^[0-9a-f]{40}$ ]] ||
@@ -315,6 +315,7 @@ for rel in \
 	etc/hotplug.d/iface/51-bridge-flow-offload \
 	etc/hotplug.d/net/50-nf-bridge-call \
 	etc/vermagic.txt usr/bin/fastfetch usr/bin/owut usr/bin/speedtest \
+	usr/libexec/rpcd/luci.netspeedtest \
 	usr/share/bridge-flow-offload \
 	usr/share/luci/menu.d/luci-app-attendedsysupgrade.json \
 	www/cgi-bin/github_check www/cgi-bin/github_fetch \
