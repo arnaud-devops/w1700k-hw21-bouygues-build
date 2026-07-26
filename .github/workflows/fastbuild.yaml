@@ -294,8 +294,8 @@ jobs:
               "profile patch tree" "./patches"
             shopt -s nullglob
             for profile_patch in "$DK_PROFILE"/patches/*.patch; do
-              patch -d . -p0 --forward --fuzz=0 --no-backup-if-mismatch \
-                < "$profile_patch"
+              git apply -p0 --check "$profile_patch"
+              git apply -p0 "$profile_patch"
             done
             shopt -u nullglob
             patch_debris=$(find . -type f \

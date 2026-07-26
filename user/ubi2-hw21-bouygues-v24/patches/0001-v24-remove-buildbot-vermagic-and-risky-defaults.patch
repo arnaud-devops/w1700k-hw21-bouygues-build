@@ -68,14 +68,11 @@
 -exit 0
 --- target/linux/airoha/patches-6.18/916-02-net-airoha-Implement-HW-GRO-TCP-support.patch
 +++ target/linux/airoha/patches-6.18/916-02-net-airoha-Implement-HW-GRO-TCP-support.patch
-@@ -536,6 +536,6 @@
- -	netdev->features |= netdev->hw_features;
- -	netdev->vlan_features = netdev->hw_features;
+@@ -538,3 +538,3 @@
  +	netdev->hw_features = AIROHA_HW_FEATURES | NETIF_F_GRO_HW;
 -+	netdev->features |= AIROHA_HW_FEATURES | NETIF_F_GRO_HW;
 ++	netdev->features |= AIROHA_HW_FEATURES;
  +	netdev->vlan_features = AIROHA_HW_FEATURES;
-  	SET_NETDEV_DEV(netdev, eth->dev);
 --- target/linux/airoha/dts/an7581.dtsi
 +++ target/linux/airoha/dts/an7581.dtsi
 @@ -232,26 +232,6 @@
